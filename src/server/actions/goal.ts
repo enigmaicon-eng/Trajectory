@@ -7,6 +7,7 @@ import { createClient } from "@/lib/db/server";
 import { draftCookie, encodeDraftToken, decodeDraftToken } from "@/lib/security/draft-token";
 import { runClarify } from "@/lib/ai/modules/clarify";
 import { runAssess } from "@/lib/ai/modules/assess";
+import { decomposeGoal } from "@/server/actions/decompose";
 import type { ClarifyOutput } from "@/lib/ai/modules/clarify/output.schema";
 import type { AssessOutput } from "@/lib/ai/modules/assess/output.schema";
 
@@ -137,5 +138,8 @@ export async function commitGoal(input: { choice: "proceed" | "extend" | "narrow
   const store = await cookies();
   store.delete(draftCookie.name);
 
-  return { goalId: goal.id as string };
+  const goalId = goal.id as string;
+  await decomposeGoal(db, goalId, user.id);
+
+  redirect(`/goals/${goalId}/map`);
 }

@@ -13,10 +13,10 @@ export default async function StartPage({
   const draft = await getDraftState();
 
   // Returning from the auth redirect with a previously-chosen fork option —
-  // finish the commit now that a session exists.
+  // finish the commit now that a session exists. commitGoal() redirects
+  // itself (to /goals/[id]/map) on success, so nothing follows this call.
   if (choice && draft?.assessment) {
     await commitGoal({ choice: choice as Choice });
-    redirect("/goals");
   }
 
   if (!draft) {
