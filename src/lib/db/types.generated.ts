@@ -1088,7 +1088,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      increment_usage_counter: {
+        Args: {
+          p_module_class: string
+          p_period_start: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       ai_module:
