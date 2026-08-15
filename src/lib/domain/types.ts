@@ -4,6 +4,7 @@
 
 export type NodeKind = "milestone" | "project";
 export type DependencyType = "blocks" | "informs";
+export type NodeHealth = "on_track" | "at_risk" | "off_track" | "unknown";
 
 export interface GraphNode {
   id: string;

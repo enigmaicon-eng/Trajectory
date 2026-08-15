@@ -102,6 +102,12 @@ export default async function GoalWeekPage({
           <a href={`/goals/${goalId}/map`} className="underline">
             Goal map
           </a>
+          <a href={`/goals/${goalId}/reflect`} className="underline">
+            Reflect
+          </a>
+          <a href={`/goals/${goalId}/history`} className="underline">
+            History
+          </a>
         </nav>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-neutral-600">{goal.outcome_statement}</p>

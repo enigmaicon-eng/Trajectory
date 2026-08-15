@@ -6,7 +6,7 @@ import { runPlanWeek } from "@/lib/ai/modules/plan_week";
 import type { PlanWeekInput } from "@/lib/ai/modules/plan_week/input.schema";
 import { readyNodes } from "@/lib/domain/graph";
 import type { GraphEdge, GraphNode } from "@/lib/domain/types";
-import { horizonEnd, todayISO, weekBoundaries } from "@/lib/domain/dates";
+import { horizonEnd, todayISO, weekBoundaries, weekBoundary, type WeekBoundary } from "@/lib/domain/dates";
 import { availableDaysInWeek, weekCapacityMinutes, type CapacityProfileLike } from "@/lib/domain/capacity";
 import { scheduleTasks, type CandidateTaskLike } from "@/lib/domain/scheduler";
 
@@ -19,38 +19,25 @@ export interface GeneratePlanResult {
   week1TaskCount: number;
 }
 
-/**
- * Creates the active plan for a goal: `plan_weeks` metadata rows (dates +
- * capacity budget) span the *entire* horizon deterministically, but only
- * week 0 gets AI-generated `weekly_outcomes`/`tasks` — matching AC-4.14's
- * <90s latency target (one `plan_week` call, not one per week of a
- * potentially 260-week horizon) and §8.3's cron, which rolls the plan
- * forward and (in Phase 5) generates each subsequent week lazily as it
- * arrives. Also usable for a replan: an existing active plan is superseded
- * first, matching plans' one-active-plan-per-goal constraint.
- */
-export async function generatePlan(db: DB, goalId: string, userId: string): Promise<GeneratePlanResult> {
-  const { data: goal, error: goalError } = await db
-    .from("goals")
-    .select("outcome_statement, domain, horizon_weeks, started_on")
-    .eq("id", goalId)
-    .single();
-  if (goalError || !goal) throw new Error(goalError?.message ?? "Goal not found");
+interface EligibleProject {
+  id: string;
+  title: string;
+  verification: string;
+  estimatedMinutes: number;
+}
 
-  const horizonWeeks = goal.horizon_weeks ?? 12;
-  const horizonStart = goal.started_on ?? todayISO();
-
-  const { data: capacityRow, error: capacityError } = await db
+async function loadCapacityProfile(db: DB, goalId: string): Promise<CapacityProfileLike> {
+  const { data: capacityRow, error } = await db
     .from("capacity_profiles")
     .select("ideal_minutes, normal_minutes, minimum_minutes, days_per_week, preferred_days, blackout_dates")
     .eq("goal_id", goalId)
     .order("effective_from", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (capacityError) throw new Error(capacityError.message);
-  if (!capacityRow) throw new Error("generatePlan: no capacity profile on record — decompose must run first");
+  if (error) throw new Error(error.message);
+  if (!capacityRow) throw new Error("No capacity profile on record — decompose must run first");
 
-  const capacity: CapacityProfileLike = {
+  return {
     idealMinutes: capacityRow.ideal_minutes,
     normalMinutes: capacityRow.normal_minutes,
     minimumMinutes: capacityRow.minimum_minutes,
@@ -58,7 +45,9 @@ export async function generatePlan(db: DB, goalId: string, userId: string): Prom
     preferredDays: capacityRow.preferred_days,
     blackoutDates: capacityRow.blackout_dates,
   };
+}
 
+async function loadEligibleProjects(db: DB, goalId: string): Promise<EligibleProject[]> {
   const { data: nodeRows, error: nodesError } = await db
     .from("goal_nodes")
     .select("id, kind, parent_id, title, verification, estimated_minutes, status")
@@ -72,7 +61,7 @@ export async function generatePlan(db: DB, goalId: string, userId: string): Prom
 
   const nodes = nodeRows ?? [];
   const edges = edgeRows ?? [];
-  if (nodes.length === 0) throw new Error("generatePlan: goal has no graph — decompose must run first");
+  if (nodes.length === 0) throw new Error("Goal has no graph — decompose must run first");
 
   const graphNodes: GraphNode[] = nodes.map((n) => ({
     id: n.id,
@@ -87,9 +76,135 @@ export async function generatePlan(db: DB, goalId: string, userId: string): Prom
   }));
   const completedIds = new Set(nodes.filter((n) => n.status === "complete").map((n) => n.id));
   const readyIds = new Set(readyNodes(graphNodes, graphEdges, completedIds));
-  const eligibleProjects = nodes.filter(
-    (n) => n.kind === "project" && readyIds.has(n.id) && n.status !== "complete" && n.status !== "dropped",
-  );
+
+  return nodes
+    .filter((n) => n.kind === "project" && readyIds.has(n.id) && n.status !== "complete" && n.status !== "dropped")
+    .map((p) => ({ id: p.id, title: p.title, verification: p.verification, estimatedMinutes: p.estimated_minutes ?? 0 }));
+}
+
+interface PersistWeekPlanResult {
+  outcomeCount: number;
+  taskCount: number;
+}
+
+/**
+ * Runs `plan_week` for one already-created `plan_weeks` row and persists its
+ * weekly outcomes + scheduled tasks. Shared by `generatePlan` (week 0, at
+ * plan-creation time) and `advanceCurrentWeek` (a later week, generated
+ * lazily by cron as it arrives — §8.3).
+ */
+async function persistWeekPlan(
+  db: DB,
+  goalId: string,
+  userId: string,
+  weekId: string,
+  week: WeekBoundary,
+  weeksRemaining: number,
+  outcomeStatement: string,
+  domain: string | null,
+  eligibleProjects: EligibleProject[],
+  capacity: CapacityProfileLike,
+  recentExecution: PlanWeekInput["recentExecution"],
+): Promise<PersistWeekPlanResult> {
+  const availableDays = availableDaysInWeek(capacity, week);
+
+  const planWeekInput: PlanWeekInput = {
+    outcomeStatement,
+    domain: domain ?? "other",
+    weekIndex: week.weekIndex,
+    weeksRemaining,
+    eligibleProjects,
+    capacity: {
+      idealMinutes: capacity.idealMinutes,
+      normalMinutes: capacity.normalMinutes,
+      minimumMinutes: capacity.minimumMinutes,
+      availableDayCount: Math.max(1, availableDays.length),
+    },
+    recentExecution,
+  };
+
+  const planWeekOutput = await runPlanWeek(planWeekInput, { userId, goalId, traceId: randomUUID(), db });
+
+  const outcomeIdByTemp = new Map<string, string>();
+  const outcomeRows = planWeekOutput.weeklyOutcomes.map((o) => {
+    const id = randomUUID();
+    outcomeIdByTemp.set(o.tempId, id);
+    return {
+      id,
+      plan_week_id: weekId,
+      goal_id: goalId,
+      user_id: userId,
+      project_node_id: o.projectNodeId,
+      statement: o.statement,
+      success_criteria: o.successCriteria,
+      priority: o.priority,
+    };
+  });
+  const { error: outcomesError } = await db.from("weekly_outcomes").insert(outcomeRows);
+  if (outcomesError) throw new Error(`Failed to persist weekly outcomes: ${outcomesError.message}`);
+
+  const candidateTasks: CandidateTaskLike[] = planWeekOutput.candidateTasks
+    .filter((t) => outcomeIdByTemp.has(t.outcomeTempId))
+    .map((t) => {
+      const outcomeRow = outcomeRows.find((o) => o.id === outcomeIdByTemp.get(t.outcomeTempId));
+      return {
+        tempId: t.tempId,
+        title: t.title,
+        why: t.why,
+        effortMinutes: t.effortMinutes,
+        tier: t.tier,
+        outcomeTempId: t.outcomeTempId,
+        projectNodeId: outcomeRow?.project_node_id ?? null,
+      };
+    });
+
+  const { scheduled } = scheduleTasks(candidateTasks, availableDays, capacity.idealMinutes);
+
+  const taskRows = scheduled.map((t) => ({
+    id: randomUUID(),
+    plan_week_id: weekId,
+    weekly_outcome_id: outcomeIdByTemp.get(t.outcomeTempId) ?? null,
+    project_node_id: t.projectNodeId,
+    goal_id: goalId,
+    user_id: userId,
+    title: t.title,
+    why: t.why,
+    effort_minutes: t.effortMinutes,
+    tier: t.tier,
+    scheduled_for: t.scheduledFor,
+    sequence: t.sequence,
+  }));
+  if (taskRows.length > 0) {
+    const { error: tasksError } = await db.from("tasks").insert(taskRows);
+    if (tasksError) throw new Error(`Failed to persist tasks: ${tasksError.message}`);
+  }
+
+  return { outcomeCount: outcomeRows.length, taskCount: taskRows.length };
+}
+
+/**
+ * Creates the active plan for a goal: `plan_weeks` metadata rows (dates +
+ * capacity budget) span the *entire* horizon deterministically, but only
+ * week 0 gets AI-generated `weekly_outcomes`/`tasks` — matching AC-4.14's
+ * <90s latency target (one `plan_week` call, not one per week of a
+ * potentially 260-week horizon) and §8.3's cron, which rolls the plan
+ * forward and generates each subsequent week lazily as it arrives (see
+ * `advanceCurrentWeek`). Also usable for a replan: an existing active plan is
+ * superseded first, matching plans' one-active-plan-per-goal constraint.
+ */
+export async function generatePlan(db: DB, goalId: string, userId: string): Promise<GeneratePlanResult> {
+  const { data: goal, error: goalError } = await db
+    .from("goals")
+    .select("outcome_statement, domain, horizon_weeks, started_on")
+    .eq("id", goalId)
+    .single();
+  if (goalError || !goal) throw new Error(goalError?.message ?? "Goal not found");
+
+  const horizonWeeks = goal.horizon_weeks ?? 12;
+  const horizonStart = goal.started_on ?? todayISO();
+
+  const capacity = await loadCapacityProfile(db, goalId);
+  const eligibleProjects = await loadEligibleProjects(db, goalId);
   // Unreachable in practice: breakCycles() already guarantees the persisted
   // graph is a DAG, and any nonempty DAG has at least one zero-indegree
   // (i.e. ready) node. Kept as a defensive guard, not a real user-facing path.
@@ -147,89 +262,19 @@ export async function generatePlan(db: DB, goalId: string, userId: string): Prom
   const { error: weeksError } = await db.from("plan_weeks").insert(weekRows);
   if (weeksError) throw new Error(`Failed to persist plan weeks: ${weeksError.message}`);
 
-  const week0 = weeks[0];
-  const week0Id = weekIds[0];
-  const availableDays = availableDaysInWeek(capacity, week0);
-
-  const planWeekInput: PlanWeekInput = {
-    outcomeStatement: goal.outcome_statement,
-    domain: goal.domain ?? "other",
-    weekIndex: 0,
-    weeksRemaining: horizonWeeks,
-    eligibleProjects: eligibleProjects.map((p) => ({
-      id: p.id,
-      title: p.title,
-      verification: p.verification,
-      estimatedMinutes: p.estimated_minutes ?? 0,
-    })),
-    capacity: {
-      idealMinutes: capacity.idealMinutes,
-      normalMinutes: capacity.normalMinutes,
-      minimumMinutes: capacity.minimumMinutes,
-      availableDayCount: Math.max(1, availableDays.length),
-    },
-    recentExecution: null,
-  };
-
-  const planWeekOutput = await runPlanWeek(planWeekInput, { userId, goalId, traceId: randomUUID(), db });
-
-  const outcomeIdByTemp = new Map<string, string>();
-  const outcomeRows = planWeekOutput.weeklyOutcomes.map((o) => {
-    const id = randomUUID();
-    outcomeIdByTemp.set(o.tempId, id);
-    return {
-      id,
-      plan_week_id: week0Id,
-      goal_id: goalId,
-      user_id: userId,
-      project_node_id: o.projectNodeId,
-      statement: o.statement,
-      success_criteria: o.successCriteria,
-      priority: o.priority,
-    };
-  });
-  const { error: outcomesError } = await db.from("weekly_outcomes").insert(outcomeRows);
-  if (outcomesError) throw new Error(`Failed to persist weekly outcomes: ${outcomesError.message}`);
-
-  const candidateTasks: CandidateTaskLike[] = planWeekOutput.candidateTasks
-    .filter((t) => outcomeIdByTemp.has(t.outcomeTempId))
-    .map((t) => {
-      const outcomeRow = outcomeRows.find((o) => o.id === outcomeIdByTemp.get(t.outcomeTempId));
-      return {
-        tempId: t.tempId,
-        title: t.title,
-        why: t.why,
-        effortMinutes: t.effortMinutes,
-        tier: t.tier,
-        outcomeTempId: t.outcomeTempId,
-        projectNodeId: outcomeRow?.project_node_id ?? null,
-      };
-    });
-
-  // Tasks the scheduler couldn't fit (over daily/weekly capacity, or past the
-  // 5-task cap) are simply not persisted — plan_week's own AC-4.13 obligation
-  // ("no week's planned effort exceeds capacity") is enforced here, by the
-  // deterministic engine, not by trusting the model's arithmetic.
-  const { scheduled } = scheduleTasks(candidateTasks, availableDays, capacity.idealMinutes);
-
-  const taskRows = scheduled.map((t) => ({
-    id: randomUUID(),
-    plan_week_id: week0Id,
-    weekly_outcome_id: outcomeIdByTemp.get(t.outcomeTempId) ?? null,
-    project_node_id: t.projectNodeId,
-    goal_id: goalId,
-    user_id: userId,
-    title: t.title,
-    why: t.why,
-    effort_minutes: t.effortMinutes,
-    tier: t.tier,
-    scheduled_for: t.scheduledFor,
-    sequence: t.sequence,
-  }));
-  if (taskRows.length > 0) {
-    const { error: tasksError } = await db.from("tasks").insert(taskRows);
-    if (tasksError) throw new Error(`Failed to persist tasks: ${tasksError.message}`);
-  }
+  const { outcomeCount, taskCount } = await persistWeekPlan(
+    db,
+    goalId,
+    userId,
+    weekIds[0],
+    weeks[0],
+    horizonWeeks,
+    goal.outcome_statement,
+    goal.domain,
+    eligibleProjects,
+    capacity,
+    null,
+  );
 
   const { error: activateError } = await db
     .from("plans")
@@ -240,7 +285,92 @@ export async function generatePlan(db: DB, goalId: string, userId: string): Prom
   return {
     planId,
     weekCount: weeks.length,
-    week1OutcomeCount: outcomeRows.length,
-    week1TaskCount: taskRows.length,
+    week1OutcomeCount: outcomeCount,
+    week1TaskCount: taskCount,
   };
+}
+
+export interface AdvanceWeekResult {
+  advanced: boolean;
+  weekIndex?: number;
+  outcomeCount?: number;
+  taskCount?: number;
+}
+
+/**
+ * §8.3 cron step 3: "roll forward the current plan_week when a week boundary
+ * passes." `plan_weeks` rows for the whole horizon already exist (created by
+ * `generatePlan`); this only needs to generate `weekly_outcomes`/`tasks` for
+ * whichever week now contains today, if it hasn't been generated yet. A
+ * goal with no active plan, or whose current week is already generated (or
+ * past the horizon), is a no-op.
+ */
+export async function advanceCurrentWeek(db: DB, goalId: string, userId: string): Promise<AdvanceWeekResult> {
+  const { data: goal, error: goalError } = await db
+    .from("goals")
+    .select("outcome_statement, domain, horizon_weeks, started_on")
+    .eq("id", goalId)
+    .single();
+  if (goalError || !goal) throw new Error(goalError?.message ?? "Goal not found");
+
+  const { data: plan } = await db
+    .from("plans")
+    .select("id")
+    .eq("goal_id", goalId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!plan) return { advanced: false };
+
+  const today = todayISO();
+  const { data: week } = await db
+    .from("plan_weeks")
+    .select("id, week_index, starts_on, ends_on")
+    .eq("plan_id", plan.id)
+    .lte("starts_on", today)
+    .gte("ends_on", today)
+    .maybeSingle();
+  if (!week) return { advanced: false };
+
+  const { count: existingOutcomes } = await db
+    .from("weekly_outcomes")
+    .select("id", { count: "exact", head: true })
+    .eq("plan_week_id", week.id);
+  if ((existingOutcomes ?? 0) > 0) return { advanced: false };
+
+  const capacity = await loadCapacityProfile(db, goalId);
+  const eligibleProjects = await loadEligibleProjects(db, goalId);
+  if (eligibleProjects.length === 0) return { advanced: false };
+
+  const { data: priorTasks } = await db
+    .from("tasks")
+    .select("effort_minutes, status")
+    .eq("goal_id", goalId)
+    .gte("scheduled_for", weekBoundary(week.starts_on, -1).startsOn)
+    .lt("scheduled_for", week.starts_on);
+  const recentExecution: PlanWeekInput["recentExecution"] = priorTasks && priorTasks.length > 0
+    ? {
+        plannedMinutes: priorTasks.reduce((s, t) => s + t.effort_minutes, 0),
+        completedMinutes: priorTasks.filter((t) => t.status === "done").reduce((s, t) => s + t.effort_minutes, 0),
+        note: "trailing week, prior to this rollover",
+      }
+    : null;
+
+  const horizonWeeks = goal.horizon_weeks ?? 12;
+  const weeksRemaining = Math.max(1, horizonWeeks - week.week_index);
+
+  const { outcomeCount, taskCount } = await persistWeekPlan(
+    db,
+    goalId,
+    userId,
+    week.id,
+    { weekIndex: week.week_index, startsOn: week.starts_on, endsOn: week.ends_on },
+    weeksRemaining,
+    goal.outcome_statement,
+    goal.domain,
+    eligibleProjects,
+    capacity,
+    recentExecution,
+  );
+
+  return { advanced: true, weekIndex: week.week_index, outcomeCount, taskCount };
 }
