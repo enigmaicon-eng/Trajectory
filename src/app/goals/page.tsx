@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 
@@ -18,13 +19,15 @@ export default async function GoalsPage() {
       <h1 className="text-xl font-medium">Your goals</h1>
       {!goals || goals.length === 0 ? (
         <p className="text-sm text-neutral-600">
-          No goals yet. <a href="/" className="underline">Start one</a>.
+          No goals yet. <Link href="/" className="underline">Start one</Link>.
         </p>
       ) : (
         <ul className="flex flex-col gap-4">
           {goals.map((goal) => (
             <li key={goal.id} className="rounded-md border border-neutral-200 p-4">
-              <p className="font-medium">{goal.title}</p>
+              <a href={`/goals/${goal.id}/today`} className="font-medium underline">
+                {goal.title}
+              </a>
               <p className="mt-1 text-sm text-neutral-600">{goal.outcome_statement}</p>
               <span className="mt-2 inline-block text-xs uppercase tracking-wide text-neutral-500">
                 {goal.status}

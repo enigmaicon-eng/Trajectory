@@ -99,9 +99,17 @@ export default async function GoalMapPage({ params }: { params: Promise<{ id: st
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
       <div>
-        <a href="/goals" className="text-sm text-neutral-500 underline">
-          ← Your goals
-        </a>
+        <nav className="flex gap-4 text-sm text-neutral-500">
+          <a href="/goals" className="underline">
+            ← Your goals
+          </a>
+          <a href={`/goals/${goalId}/today`} className="underline">
+            Today
+          </a>
+          <a href={`/goals/${goalId}/week`} className="underline">
+            This week
+          </a>
+        </nav>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-neutral-600">{goal.outcome_statement}</p>
       </div>
