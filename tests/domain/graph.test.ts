@@ -5,6 +5,7 @@ import {
   CycleError,
   detectCycleEdge,
   isAcyclic,
+  readyNodes,
   topoSort,
 } from "@/lib/domain/graph";
 import type { GraphEdge, GraphNode } from "@/lib/domain/types";
@@ -182,5 +183,39 @@ describe("fuzz: breakCycles guarantees acyclicity", () => {
       expect(() => topoSort(nodes, repaired)).not.toThrow();
       expect(() => criticalPath(nodes, repaired)).not.toThrow();
     }
+  });
+});
+
+describe("readyNodes", () => {
+  it("returns nodes with no blocks predecessors when nothing is complete", () => {
+    const nodes = [milestone("a"), milestone("b"), milestone("c")];
+    const edges = [blocks("a", "b"), blocks("b", "c")];
+    expect(readyNodes(nodes, edges, new Set())).toEqual(["a"]);
+  });
+
+  it("unlocks a node once all its predecessors are complete", () => {
+    const nodes = [milestone("a"), milestone("b"), milestone("c")];
+    const edges = [blocks("a", "c"), blocks("b", "c")];
+    // "a" is already complete, so it's excluded from the ready set even
+    // though it has no predecessors of its own.
+    expect(readyNodes(nodes, edges, new Set(["a"]))).toEqual(["b"]);
+    expect(readyNodes(nodes, edges, new Set(["a", "b"]))).toEqual(["c"]);
+  });
+
+  it("excludes already-completed nodes from the result", () => {
+    const nodes = [milestone("a"), milestone("b")];
+    const edges = [blocks("a", "b")];
+    expect(readyNodes(nodes, edges, new Set(["a"]))).toEqual(["b"]);
+  });
+
+  it("ignores informs edges when computing readiness", () => {
+    const nodes = [milestone("a"), milestone("b")];
+    const edges = [informs("a", "b")];
+    expect(readyNodes(nodes, edges, new Set())).toEqual(["a", "b"]);
+  });
+
+  it("every node is ready in a graph with no edges", () => {
+    const nodes = [milestone("a"), milestone("b"), milestone("c")];
+    expect(readyNodes(nodes, [], new Set())).toEqual(["a", "b", "c"]);
   });
 });

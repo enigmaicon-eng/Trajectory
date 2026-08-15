@@ -8,6 +8,7 @@ import { draftCookie, encodeDraftToken, decodeDraftToken } from "@/lib/security/
 import { runClarify } from "@/lib/ai/modules/clarify";
 import { runAssess } from "@/lib/ai/modules/assess";
 import { decomposeGoal } from "@/server/actions/decompose";
+import { generatePlan } from "@/server/actions/plan";
 import type { ClarifyOutput } from "@/lib/ai/modules/clarify/output.schema";
 import type { AssessOutput } from "@/lib/ai/modules/assess/output.schema";
 
@@ -140,6 +141,7 @@ export async function commitGoal(input: { choice: "proceed" | "extend" | "narrow
 
   const goalId = goal.id as string;
   await decomposeGoal(db, goalId, user.id);
+  await generatePlan(db, goalId, user.id);
 
-  redirect(`/goals/${goalId}/map`);
+  redirect(`/goals/${goalId}/today`);
 }

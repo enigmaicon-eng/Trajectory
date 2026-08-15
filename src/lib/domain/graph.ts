@@ -219,3 +219,21 @@ export function criticalPath(nodes: GraphNode[], edges: GraphEdge[]): CriticalPa
     projectLengthMinutes,
   };
 }
+
+/**
+ * Nodes whose every `blocks` predecessor is already in `completedIds` — i.e.
+ * nodes that could start right now. Used by plan generation (§5.2 `plan_week`)
+ * to ground the AI call in what's actually actionable, and by replanning to
+ * re-evaluate readiness after a graph edit.
+ */
+export function readyNodes(nodes: GraphNode[], edges: GraphEdge[], completedIds: Set<string>): string[] {
+  const predecessors = new Map<string, string[]>();
+  for (const n of nodes) predecessors.set(n.id, []);
+  for (const e of blocksEdges(edges)) {
+    predecessors.get(e.toNodeId)?.push(e.fromNodeId);
+  }
+  return nodes
+    .filter((n) => !completedIds.has(n.id))
+    .filter((n) => (predecessors.get(n.id) ?? []).every((p) => completedIds.has(p)))
+    .map((n) => n.id);
+}
