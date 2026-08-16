@@ -42,14 +42,17 @@ export async function runModule<TIn, TOut>(
   rawInput: TIn,
   ctx: RunContext,
 ): Promise<TOut> {
+  const input = def.inputSchema.parse(rawInput);
+  const { provider, usedByok } = await resolveProvider(ctx.userId);
+
   // Pre-auth calls (onboarding clarify/assess) have no user row yet — quota
   // and ai_runs both FK to auth.users, so neither applies until sign-in.
-  if (ctx.userId) {
+  // §9: BYOK is unlimited (the user's own quota), so it bypasses the
+  // platform counters entirely.
+  if (ctx.userId && !usedByok) {
     await checkAndIncrementUsage(ctx.db, ctx.userId, def.moduleClass);
   }
 
-  const input = def.inputSchema.parse(rawInput);
-  const provider = await resolveProvider(ctx.userId);
   const { system, prompt } = def.buildPrompt(input);
 
   let attempts = 0;
@@ -104,7 +107,7 @@ export async function runModule<TIn, TOut>(
       provider: provider.id,
       model: lastModel,
       prompt_version: "v1",
-      used_byok: false,
+      used_byok: usedByok,
       status,
       attempts,
       input_tokens: lastUsage.inputTokens ?? null,
