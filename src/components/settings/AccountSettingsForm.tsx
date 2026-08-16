@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { updateProfile } from "@/server/actions/settings";
+import { buttonClass } from "@/components/ui/button-styles";
 
 const FALLBACK_TIMEZONES = [
   "UTC",
@@ -63,7 +64,7 @@ export function AccountSettingsForm({
         <p className="mt-1 font-medium capitalize">{tier === "byok" ? "Your own key" : "Free"}</p>
         {tier === "free" && (
           <a href="/settings/ai" className="mt-1 inline-block text-sm underline">
-            Add an AI key to remove generation limits
+            Add your own key to remove generation limits
           </a>
         )}
       </div>
@@ -108,7 +109,7 @@ export function AccountSettingsForm({
         <button
           type="submit"
           disabled={status === "saving"}
-          className="self-start rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+          className={`self-start ${buttonClass("primary")}`}
         >
           {status === "saving" ? "Saving..." : "Save changes"}
         </button>

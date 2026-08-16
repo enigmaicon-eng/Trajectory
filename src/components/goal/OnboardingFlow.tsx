@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { answerIntake, commitGoal, type GoalDraft } from "@/server/actions/goal";
 import type { AssessOutput } from "@/lib/ai/modules/assess/output.schema";
+import { buttonClass } from "@/components/ui/button-styles";
 
 type Choice = "proceed" | "extend" | "narrow";
 type Step = "questions" | "assessing" | "assessment" | "committing" | "error" | "quota";
@@ -72,17 +73,14 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
           {quotaResetsAt ? formatResetsAt(quotaResetsAt) : "soon"}.
         </p>
         <p className="text-sm text-neutral-600">
-          Your goal is saved — nothing is lost. Add your own AI key to remove this limit and
+          Your goal is saved — nothing is lost. Add your own key to remove this limit and
           finish building it now.
         </p>
         <div className="flex gap-3">
-          <a
-            href="/settings/ai"
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white"
-          >
-            Add an AI key
+          <a href="/settings/ai" className={buttonClass("primary")}>
+            Add a key
           </a>
-          <a href="/goals" className="rounded-md border border-neutral-300 px-4 py-2 text-sm">
+          <a href="/goals" className={buttonClass("secondary")}>
             Back to your goals
           </a>
         </div>
@@ -96,7 +94,7 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
         <p className="text-sm text-red-600">We couldn&apos;t produce a reliable plan.</p>
         <button
           onClick={() => setStep(assessment ? "assessment" : "questions")}
-          className="self-start rounded-md border border-neutral-300 px-3 py-2 text-sm"
+          className={`self-start ${buttonClass("secondary")}`}
         >
           Retry
         </button>
@@ -131,7 +129,7 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
             <button
               type="submit"
               disabled={step === "assessing"}
-              className="self-start rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+              className={`self-start ${buttonClass("primary")}`}
             >
               {step === "assessing" ? "Assessing feasibility..." : "Continue"}
             </button>
@@ -140,11 +138,14 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
           <button
             onClick={() => void submitAnswers()}
             disabled={step === "assessing"}
-            className="self-start rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+            className={`self-start ${buttonClass("primary")}`}
           >
             {step === "assessing" ? "Assessing feasibility..." : "Continue"}
           </button>
         )}
+        <p role="status" aria-live="polite" className="sr-only">
+          {step === "assessing" ? "Assessing feasibility" : ""}
+        </p>
       </div>
     );
   }
@@ -176,21 +177,21 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
             <button
               onClick={() => handleChoice("extend")}
               disabled={step === "committing"}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+              className={buttonClass("primary")}
             >
               Extend the timeline
             </button>
             <button
               onClick={() => handleChoice("narrow")}
               disabled={step === "committing"}
-              className="rounded-md border border-neutral-300 px-4 py-2 text-sm disabled:opacity-40"
+              className={buttonClass("secondary")}
             >
               Narrow the outcome
             </button>
             <button
               onClick={() => handleChoice("proceed")}
               disabled={step === "committing"}
-              className="rounded-md border border-neutral-300 px-4 py-2 text-sm disabled:opacity-40"
+              className={buttonClass("secondary")}
             >
               Proceed anyway
             </button>
@@ -199,12 +200,15 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
           <button
             onClick={() => handleChoice("proceed")}
             disabled={step === "committing"}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+            className={buttonClass("primary")}
           >
             {step === "committing" ? "Building your plan..." : "Build my plan"}
           </button>
         )}
       </div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {step === "committing" ? "Building your plan" : ""}
+      </p>
     </div>
   );
 }

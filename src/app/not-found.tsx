@@ -1,3 +1,5 @@
+import { buttonClass } from "@/components/ui/button-styles";
+
 export default function NotFound() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col items-start justify-center gap-4 px-6 py-16">
@@ -5,7 +7,7 @@ export default function NotFound() {
       <p className="text-sm text-neutral-600">
         This page doesn&apos;t exist, or you don&apos;t have access to it.
       </p>
-      <a href="/goals" className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white">
+      <a href="/goals" className={buttonClass("primary")}>
         Back to your goals
       </a>
     </main>

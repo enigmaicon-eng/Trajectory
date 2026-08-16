@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { retryGeneration } from "@/server/actions/goal";
+import { buttonClass } from "@/components/ui/button-styles";
 
 function formatResetsAt(iso: string): string {
   try {
@@ -40,8 +41,8 @@ export function GenerateNowButton({ goalId }: { goalId: string }) {
         <p className="text-neutral-800">
           Still over the free plan&apos;s limit — resets {resetsAt ? formatResetsAt(resetsAt) : "soon"}.
         </p>
-        <a href="/settings/ai" className="self-start rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white">
-          Add an AI key to finish now
+        <a href="/settings/ai" className={`self-start ${buttonClass("primary", "small")}`}>
+          Add a key to finish now
         </a>
       </div>
     );
@@ -52,7 +53,7 @@ export function GenerateNowButton({ goalId }: { goalId: string }) {
       <button
         onClick={handleClick}
         disabled={state === "busy"}
-        className="self-start rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
+        className={`self-start ${buttonClass("primary", "small")}`}
       >
         {state === "busy" ? "Generating..." : "Generate now"}
       </button>

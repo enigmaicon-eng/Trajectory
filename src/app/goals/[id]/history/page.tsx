@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { respondToReplan } from "@/server/actions/adapt";
+import { buttonClass } from "@/components/ui/button-styles";
 import type { PlanOp } from "@/lib/ai/modules/replan/output.schema";
 
 const OP_LABEL: Record<PlanOp["op"], string> = {
@@ -67,7 +68,7 @@ export default async function GoalHistoryPage({ params }: { params: Promise<{ id
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
       <div>
-        <nav className="flex gap-4 text-sm text-neutral-500">
+        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
           <a href={`/goals/${goalId}/today`} className="underline">
             Today
           </a>
@@ -115,15 +116,12 @@ export default async function GoalHistoryPage({ params }: { params: Promise<{ id
                 )}
                 <div className="mt-4 flex gap-2">
                   <form action={acceptAction}>
-                    <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white">
+                    <button type="submit" className={buttonClass("primary", "small")}>
                       Accept
                     </button>
                   </form>
                   <form action={rejectAction}>
-                    <button
-                      type="submit"
-                      className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700"
-                    >
+                    <button type="submit" className={buttonClass("secondary", "small")}>
                       Reject
                     </button>
                   </form>

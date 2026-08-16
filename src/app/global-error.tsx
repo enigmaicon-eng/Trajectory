@@ -1,5 +1,7 @@
 "use client";
 
+import { buttonClass } from "@/components/ui/button-styles";
+
 // Only fires if the root layout itself throws — everywhere else, app/error.tsx
 // handles it. Next requires this file to render its own <html>/<body> since it
 // replaces the root layout wholesale.
@@ -12,10 +14,7 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
           <p className="text-sm text-neutral-600">
             The app hit an unexpected error. Nothing was lost — try reloading.
           </p>
-          <button
-            onClick={() => reset()}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white"
-          >
+          <button onClick={() => reset()} className={buttonClass("primary")}>
             Reload
           </button>
         </main>

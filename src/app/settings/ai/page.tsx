@@ -14,7 +14,7 @@ export default async function AiSettingsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
-      <nav className="flex gap-4 text-sm text-neutral-500">
+      <nav aria-label="Settings" className="flex gap-4 text-sm text-neutral-500">
         <a href="/goals" className="underline">
           ← Your goals
         </a>
@@ -23,7 +23,7 @@ export default async function AiSettingsPage() {
         </a>
       </nav>
       <div>
-        <h1 className="text-xl font-medium">AI provider keys</h1>
+        <h1 className="text-xl font-medium">Provider keys</h1>
         <p className="mt-2 text-sm text-neutral-600">
           Trajectory runs on a shared free tier by default. Add your own key to remove the
           generation limits and use your own quota.

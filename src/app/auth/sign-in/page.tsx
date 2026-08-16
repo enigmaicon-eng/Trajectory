@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/db/client";
 import { useState } from "react";
+import { buttonClass } from "@/components/ui/button-styles";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
@@ -43,10 +44,7 @@ export default function SignInPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
           />
-          <button
-            type="submit"
-            className="rounded-md bg-neutral-900 px-3 py-2 text-sm text-white"
-          >
+          <button type="submit" className={buttonClass("primary")}>
             Send sign-in link
           </button>
           {status === "error" && (
@@ -61,10 +59,7 @@ export default function SignInPage() {
         <div className="h-px flex-1 bg-neutral-200" />
       </div>
 
-      <button
-        onClick={signInWithGoogle}
-        className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-      >
+      <button onClick={signInWithGoogle} className={buttonClass("secondary")}>
         Continue with Google
       </button>
     </main>

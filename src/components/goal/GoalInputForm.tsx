@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createGoalDraft } from "@/server/actions/goal";
+import { buttonClass } from "@/components/ui/button-styles";
 
 export function GoalInputForm() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export function GoalInputForm() {
       <button
         type="submit"
         disabled={status === "submitting" || !rawInput.trim()}
-        className="self-start rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+        className={`self-start ${buttonClass("primary")}`}
       >
         {status === "submitting" ? "Thinking..." : "Get started"}
       </button>

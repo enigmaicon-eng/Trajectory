@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { submitReflection } from "@/server/actions/reflect";
 import { requestReplan } from "@/server/actions/adapt";
+import { buttonClass } from "@/components/ui/button-styles";
 
 function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -94,7 +95,7 @@ export default async function GoalReflectPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
       <div>
-        <nav className="flex gap-4 text-sm text-neutral-500">
+        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
           <a href={`/goals/${goalId}/today`} className="underline">
             Today
           </a>
@@ -171,7 +172,7 @@ export default async function GoalReflectPage({
             </div>
           )}
           <form action={requestReplanAction}>
-            <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700">
+            <button type="submit" className={buttonClass("secondary", "small")}>
               Request a replan
             </button>
           </form>
@@ -190,13 +191,13 @@ export default async function GoalReflectPage({
             Blockers
             <textarea name="blockers" rows={3} className="rounded-md border border-neutral-300 px-3 py-2" />
           </label>
-          <button type="submit" className="self-start rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white">
+          <button type="submit" className={`self-start ${buttonClass("primary", "small")}`}>
             Submit reflection
           </button>
         </form>
       )}
 
-      <nav className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
+      <nav aria-label="Week navigation" className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
         {weekIndex > 0 ? (
           <a href={`/goals/${goalId}/reflect?week=${weekIndex - 1}`} className="underline">
             ← Previous week

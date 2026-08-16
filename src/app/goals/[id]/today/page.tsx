@@ -3,6 +3,7 @@ import { createClient } from "@/lib/db/server";
 import { packDayTiers, type DayTaskLike } from "@/lib/domain/day-tiers";
 import { todayISO } from "@/lib/domain/dates";
 import { completeTask, skipTask, submitCheckIn } from "@/server/actions/execution";
+import { buttonClass } from "@/components/ui/button-styles";
 
 function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -106,12 +107,12 @@ export default async function GoalTodayPage({
         </p>
       ) : (
         <>
-          <div className="flex gap-2 border-b border-neutral-200 pb-4">
+          <div className="flex gap-2 overflow-x-auto border-b border-neutral-200 pb-4">
             {(Object.keys(TIER_LABEL) as Tier[]).map((t) => (
               <a
                 key={t}
                 href={`/goals/${goalId}/today?tier=${t}`}
-                className={`rounded-full px-3 py-1.5 text-sm ${
+                className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 ${
                   t === selectedTier
                     ? "bg-neutral-900 text-white"
                     : "border border-neutral-300 text-neutral-700"
@@ -143,18 +144,12 @@ export default async function GoalTodayPage({
                   {t.why && <p className="mt-1 text-sm text-neutral-600">{t.why}</p>}
                   <div className="mt-3 flex gap-2">
                     <form action={completeTask.bind(null, { taskId: t.id })}>
-                      <button
-                        type="submit"
-                        className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs text-white"
-                      >
+                      <button type="submit" className={buttonClass("primary", "small")}>
                         Done
                       </button>
                     </form>
                     <form action={skipTask.bind(null, { taskId: t.id })}>
-                      <button
-                        type="submit"
-                        className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700"
-                      >
+                      <button type="submit" className={buttonClass("secondary", "small")}>
                         Skip
                       </button>
                     </form>
@@ -186,7 +181,7 @@ export default async function GoalTodayPage({
             className="w-20 rounded-md border border-neutral-300 px-2 py-1"
           />
         </label>
-        <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700">
+        <button type="submit" className={buttonClass("secondary", "small")}>
           Check in
         </button>
       </form>

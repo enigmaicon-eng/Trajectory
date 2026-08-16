@@ -17,12 +17,12 @@ export default async function AccountSettingsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
-      <nav className="flex gap-4 text-sm text-neutral-500">
+      <nav aria-label="Settings" className="flex gap-4 text-sm text-neutral-500">
         <a href="/goals" className="underline">
           ← Your goals
         </a>
         <a href="/settings/ai" className="underline">
-          AI settings
+          Provider keys
         </a>
       </nav>
       <div>

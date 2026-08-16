@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { saveApiKey, deleteApiKey } from "@/server/actions/settings";
 import type { ByokProvider, ByokStatus } from "@/lib/security/byok-session";
+import { buttonClass } from "@/components/ui/button-styles";
 
 const PROVIDERS: Array<{ id: ByokProvider; label: string; live: boolean }> = [
   { id: "gemini", label: "Gemini", live: true },
@@ -75,7 +76,7 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
                   type="button"
                   disabled={busy}
                   onClick={() => handleRemove(id)}
-                  className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-40"
+                  className={`shrink-0 ${buttonClass("secondary", "small")}`}
                 >
                   Remove
                 </button>
@@ -89,7 +90,7 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
                     setDraft("");
                     setError(null);
                   }}
-                  className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm disabled:opacity-40"
+                  className={`shrink-0 ${buttonClass("secondary", "small")}`}
                 >
                   Add key
                 </button>
@@ -117,7 +118,7 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
                   <button
                     type="submit"
                     disabled={busy || !draft.trim()}
-                    className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
+                    className={buttonClass("primary", "small")}
                   >
                     {busy ? "Verifying..." : "Save"}
                   </button>
@@ -128,7 +129,7 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
                       setEditing(null);
                       setError(null);
                     }}
-                    className="rounded-md px-3 py-1.5 text-sm text-neutral-600"
+                    className={buttonClass("ghost", "small")}
                   >
                     Cancel
                   </button>

@@ -100,7 +100,7 @@ export default async function GoalMapPage({ params }: { params: Promise<{ id: st
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
       <div>
-        <nav className="flex gap-4 text-sm text-neutral-500">
+        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
           <a href="/goals" className="underline">
             ← Your goals
           </a>

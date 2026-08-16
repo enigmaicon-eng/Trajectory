@@ -97,7 +97,7 @@ export default async function GoalWeekPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
       <div>
-        <nav className="flex gap-4 text-sm text-neutral-500">
+        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
           <a href={`/goals/${goalId}/today`} className="underline">
             Today
           </a>
@@ -198,7 +198,7 @@ export default async function GoalWeekPage({
         </div>
       )}
 
-      <nav className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
+      <nav aria-label="Week navigation" className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
         {weekIndex > 0 ? (
           <a href={`/goals/${goalId}/week?week=${weekIndex - 1}`} className="underline">
             ← Previous week

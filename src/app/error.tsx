@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { buttonClass } from "@/components/ui/button-styles";
 
 export default function Error({
   error,
@@ -20,13 +21,10 @@ export default function Error({
         We hit a snag loading this. Nothing you did caused it, and nothing was lost.
       </p>
       <div className="flex gap-3">
-        <button
-          onClick={() => reset()}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white"
-        >
+        <button onClick={() => reset()} className={buttonClass("primary")}>
           Retry
         </button>
-        <a href="/goals" className="rounded-md border border-neutral-300 px-4 py-2 text-sm">
+        <a href="/goals" className={buttonClass("secondary")}>
           Back to your goals
         </a>
       </div>
