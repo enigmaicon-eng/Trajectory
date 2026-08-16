@@ -18,8 +18,8 @@ export default async function GoalsPage() {
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-medium">Your goals</h1>
-        <Link href="/settings/ai" className="text-sm text-neutral-500 underline">
-          AI settings
+        <Link href="/settings/account" className="text-sm text-neutral-500 underline">
+          Account
         </Link>
       </div>
       {!goals || goals.length === 0 ? (

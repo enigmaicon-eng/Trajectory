@@ -14,6 +14,14 @@ export default async function AiSettingsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
+      <nav className="flex gap-4 text-sm text-neutral-500">
+        <a href="/goals" className="underline">
+          ← Your goals
+        </a>
+        <a href="/settings/account" className="underline">
+          Account
+        </a>
+      </nav>
       <div>
         <h1 className="text-xl font-medium">AI provider keys</h1>
         <p className="mt-2 text-sm text-neutral-600">

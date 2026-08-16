@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
+import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
 
 function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -45,9 +46,10 @@ export default async function GoalWeekPage({
         </a>
         <h1 className="text-xl font-medium">{goal.title}</h1>
         <p className="text-sm text-neutral-600">
-          This goal doesn&apos;t have an active plan yet. That shouldn&apos;t normally happen — try creating a
-          new goal.
+          This goal doesn&apos;t have an active plan yet — generation may have been interrupted
+          (often a temporary generation limit).
         </p>
+        <GenerateNowButton goalId={goalId} />
       </main>
     );
   }

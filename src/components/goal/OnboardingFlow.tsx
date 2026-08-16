@@ -5,7 +5,20 @@ import { answerIntake, commitGoal, type GoalDraft } from "@/server/actions/goal"
 import type { AssessOutput } from "@/lib/ai/modules/assess/output.schema";
 
 type Choice = "proceed" | "extend" | "narrow";
-type Step = "questions" | "assessing" | "assessment" | "committing" | "error";
+type Step = "questions" | "assessing" | "assessment" | "committing" | "error" | "quota";
+
+function formatResetsAt(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return "soon";
+  }
+}
 
 const VERDICT_LABEL: Record<AssessOutput["verdict"], string> = {
   realistic: "Realistic",
@@ -19,6 +32,7 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
     initialDraft.assessment,
   );
   const [step, setStep] = useState<Step>(assessment ? "assessment" : "questions");
+  const [quotaResetsAt, setQuotaResetsAt] = useState<string | null>(null);
 
   async function submitAnswers() {
     setStep("assessing");
@@ -39,11 +53,41 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
   async function handleChoice(choice: Choice) {
     setStep("committing");
     try {
-      await commitGoal({ choice });
+      const result = await commitGoal({ choice });
       // On success commitGoal redirects server-side (sign-in, or /goals).
+      if (result?.error === "quota_exceeded") {
+        setQuotaResetsAt(result.resetsAt);
+        setStep("quota");
+      }
     } catch {
       setStep("error");
     }
+  }
+
+  if (step === "quota") {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-neutral-800">
+          You&apos;ve hit the free plan&apos;s limit for building new plans right now. It resets{" "}
+          {quotaResetsAt ? formatResetsAt(quotaResetsAt) : "soon"}.
+        </p>
+        <p className="text-sm text-neutral-600">
+          Your goal is saved — nothing is lost. Add your own AI key to remove this limit and
+          finish building it now.
+        </p>
+        <div className="flex gap-3">
+          <a
+            href="/settings/ai"
+            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white"
+          >
+            Add an AI key
+          </a>
+          <a href="/goals" className="rounded-md border border-neutral-300 px-4 py-2 text-sm">
+            Back to your goals
+          </a>
+        </div>
+      </div>
+    );
   }
 
   if (step === "error") {

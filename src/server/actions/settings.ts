@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/db/server";
 import {
   setByokKey,
@@ -67,4 +68,29 @@ export async function saveApiKey(
 export async function deleteApiKey(input: { provider: ByokProvider }): Promise<void> {
   await requireUserId();
   await clearByokKey(input.provider);
+}
+
+const updateProfileInput = z.object({
+  displayName: z.string().trim().max(120).optional(),
+  timezone: z.string().trim().min(1).max(64).optional(),
+});
+
+export async function updateProfile(input: z.infer<typeof updateProfileInput>): Promise<void> {
+  const { displayName, timezone } = updateProfileInput.parse(input);
+  const db = await createClient();
+  const {
+    data: { user },
+  } = await db.auth.getUser();
+  if (!user) throw new Error("Sign in to update your profile.");
+
+  const { error } = await db
+    .from("profiles")
+    .update({
+      ...(displayName !== undefined ? { display_name: displayName || null } : {}),
+      ...(timezone !== undefined ? { timezone } : {}),
+    })
+    .eq("id", user.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/settings/account");
 }

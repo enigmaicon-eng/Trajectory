@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { criticalPath, CycleError } from "@/lib/domain/graph";
 import type { GraphEdge, GraphNode } from "@/lib/domain/types";
+import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
 
 function formatMinutes(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -115,10 +116,13 @@ export default async function GoalMapPage({ params }: { params: Promise<{ id: st
       </div>
 
       {nodes.length === 0 ? (
-        <p className="text-sm text-neutral-600">
-          This goal doesn&apos;t have a graph yet. That shouldn&apos;t normally happen — try creating a new
-          goal.
-        </p>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-neutral-600">
+            This goal doesn&apos;t have a graph yet — generation may have been interrupted (often
+            a temporary generation limit).
+          </p>
+          <GenerateNowButton goalId={goalId} />
+        </div>
       ) : (
         <>
           <dl className="flex flex-wrap gap-x-8 gap-y-2 border-b border-neutral-200 pb-6 text-sm">
