@@ -3,6 +3,9 @@ import { runModule } from "../../run";
 import { clarifyInputSchema, type ClarifyInput } from "./input.schema";
 import { clarifyOutputSchema, type ClarifyOutput } from "./output.schema";
 import { buildClarifyPrompt } from "./prompt.v1";
+import { applyClarifyInvariants } from "./invariants";
+
+export { applyClarifyInvariants } from "./invariants";
 
 const clarifyModule: ModuleDefinition<ClarifyInput, ClarifyOutput> = {
   name: "clarify",
@@ -11,12 +14,7 @@ const clarifyModule: ModuleDefinition<ClarifyInput, ClarifyOutput> = {
   outputSchema: clarifyOutputSchema,
   schemaName: "ClarifyOutput",
   buildPrompt: buildClarifyPrompt,
-  applyInvariants: (output) => {
-    if (output.questions.length > 4) {
-      return { ...output, questions: output.questions.slice(0, 4) };
-    }
-    return output;
-  },
+  applyInvariants: applyClarifyInvariants,
 };
 
 export async function runClarify(input: ClarifyInput, ctx: RunContext): Promise<ClarifyOutput> {
