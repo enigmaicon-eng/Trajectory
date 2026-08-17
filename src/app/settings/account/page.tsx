@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { AccountSettingsForm } from "@/components/settings/AccountSettingsForm";
@@ -18,12 +19,12 @@ export default async function AccountSettingsPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
       <nav aria-label="Settings" className="flex gap-4 text-sm text-neutral-500">
-        <a href="/goals" className="underline">
+        <Link href="/goals" className="underline">
           ← Your goals
-        </a>
-        <a href="/settings/ai" className="underline">
+        </Link>
+        <Link href="/settings/ai" className="underline">
           Provider keys
-        </a>
+        </Link>
       </nav>
       <div>
         <h1 className="text-xl font-medium">Account</h1>

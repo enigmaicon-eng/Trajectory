@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { packDayTiers, type DayTaskLike } from "@/lib/domain/day-tiers";
@@ -93,23 +94,23 @@ export default async function GoalTodayPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
       <div>
-        <a href={`/goals/${goalId}/week`} className="text-sm text-neutral-500 underline">
+        <Link href={`/goals/${goalId}/week`} className="text-sm text-neutral-500 underline">
           ← This week
-        </a>
+        </Link>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-sm text-neutral-500">{today}</p>
       </div>
 
       {allTasks.length === 0 ? (
         <p className="text-sm text-neutral-600">
-          Nothing scheduled today. Check <a href={`/goals/${goalId}/week`} className="underline">this week</a>{" "}
+          Nothing scheduled today. Check <Link href={`/goals/${goalId}/week`} className="underline">this week</Link>{" "}
           for what&apos;s coming up.
         </p>
       ) : (
         <>
           <div className="flex gap-2 overflow-x-auto border-b border-neutral-200 pb-4">
             {(Object.keys(TIER_LABEL) as Tier[]).map((t) => (
-              <a
+              <Link
                 key={t}
                 href={`/goals/${goalId}/today?tier=${t}`}
                 className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 ${
@@ -120,7 +121,7 @@ export default async function GoalTodayPage({
               >
                 {TIER_LABEL[t]}
                 <span className="ml-1.5 tabular-nums opacity-70">({tiers[t].length})</span>
-              </a>
+              </Link>
             ))}
           </div>
 

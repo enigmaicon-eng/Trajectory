@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { submitReflection } from "@/server/actions/reflect";
@@ -41,9 +42,9 @@ export default async function GoalReflectPage({
   if (!plan) {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-16">
-        <a href={`/goals/${goalId}/today`} className="text-sm text-neutral-500 underline">
+        <Link href={`/goals/${goalId}/today`} className="text-sm text-neutral-500 underline">
           ← Today
-        </a>
+        </Link>
         <h1 className="text-xl font-medium">{goal.title}</h1>
         <p className="text-sm text-neutral-600">No active plan yet — nothing to reflect on.</p>
       </main>
@@ -96,15 +97,15 @@ export default async function GoalReflectPage({
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
       <div>
         <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <a href={`/goals/${goalId}/today`} className="underline">
+          <Link href={`/goals/${goalId}/today`} className="underline">
             Today
-          </a>
-          <a href={`/goals/${goalId}/week`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/week`} className="underline">
             This week
-          </a>
-          <a href={`/goals/${goalId}/history`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/history`} className="underline">
             History
-          </a>
+          </Link>
         </nav>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-sm text-neutral-500">
@@ -199,15 +200,15 @@ export default async function GoalReflectPage({
 
       <nav aria-label="Week navigation" className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
         {weekIndex > 0 ? (
-          <a href={`/goals/${goalId}/reflect?week=${weekIndex - 1}`} className="underline">
+          <Link href={`/goals/${goalId}/reflect?week=${weekIndex - 1}`} className="underline">
             ← Previous week
-          </a>
+          </Link>
         ) : (
           <span />
         )}
-        <a href={`/goals/${goalId}/reflect?week=${weekIndex + 1}`} className="underline">
+        <Link href={`/goals/${goalId}/reflect?week=${weekIndex + 1}`} className="underline">
           Next week →
-        </a>
+        </Link>
       </nav>
     </main>
   );

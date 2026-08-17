@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { buttonClass } from "@/components/ui/button-styles";
 
 export default function NotFound() {
@@ -7,9 +8,9 @@ export default function NotFound() {
       <p className="text-sm text-neutral-600">
         This page doesn&apos;t exist, or you don&apos;t have access to it.
       </p>
-      <a href="/goals" className={buttonClass("primary")}>
+      <Link href="/goals" className={buttonClass("primary")}>
         Back to your goals
-      </a>
+      </Link>
     </main>
   );
 }

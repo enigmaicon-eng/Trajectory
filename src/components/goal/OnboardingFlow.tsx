@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { answerIntake, commitGoal, type GoalDraft } from "@/server/actions/goal";
 import type { AssessOutput } from "@/lib/ai/modules/assess/output.schema";
 import { buttonClass } from "@/components/ui/button-styles";
@@ -77,12 +78,12 @@ export function OnboardingFlow({ initialDraft }: { initialDraft: GoalDraft }) {
           finish building it now.
         </p>
         <div className="flex gap-3">
-          <a href="/settings/ai" className={buttonClass("primary")}>
+          <Link href="/settings/ai" className={buttonClass("primary")}>
             Add a key
-          </a>
-          <a href="/goals" className={buttonClass("secondary")}>
+          </Link>
+          <Link href="/goals" className={buttonClass("secondary")}>
             Back to your goals
-          </a>
+          </Link>
         </div>
       </div>
     );

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { listByokStatus } from "@/lib/security/byok-session";
@@ -15,12 +16,12 @@ export default async function AiSettingsPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
       <nav aria-label="Settings" className="flex gap-4 text-sm text-neutral-500">
-        <a href="/goals" className="underline">
+        <Link href="/goals" className="underline">
           ← Your goals
-        </a>
-        <a href="/settings/account" className="underline">
+        </Link>
+        <Link href="/settings/account" className="underline">
           Account
-        </a>
+        </Link>
       </nav>
       <div>
         <h1 className="text-xl font-medium">Provider keys</h1>

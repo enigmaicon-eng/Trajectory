@@ -30,9 +30,9 @@ export default async function GoalsPage() {
         <ul className="flex flex-col gap-4">
           {goals.map((goal) => (
             <li key={goal.id} className="rounded-md border border-neutral-200 p-4">
-              <a href={`/goals/${goal.id}/today`} className="font-medium underline">
+              <Link href={`/goals/${goal.id}/today`} className="font-medium underline">
                 {goal.title}
-              </a>
+              </Link>
               <p className="mt-1 text-sm text-neutral-600">{goal.outcome_statement}</p>
               <span className="mt-2 inline-block text-xs uppercase tracking-wide text-neutral-500">
                 {goal.status}

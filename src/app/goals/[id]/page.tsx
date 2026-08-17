@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { criticalPath, CycleError } from "@/lib/domain/graph";
@@ -13,12 +14,6 @@ type SignalField = { value: number | string; basis: string; caveat?: string | nu
 
 function hasValue(field: SignalField | undefined): field is { value: number | string; basis: string; caveat?: string | null } {
   return !!field && "value" in field;
-}
-
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${hours}h`;
 }
 
 function formatPercent(value: number): string {
@@ -123,21 +118,21 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
       <div>
         <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <a href={`/goals/${goalId}/today`} className="underline">
+          <Link href={`/goals/${goalId}/today`} className="underline">
             Today
-          </a>
-          <a href={`/goals/${goalId}/week`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/week`} className="underline">
             This week
-          </a>
-          <a href={`/goals/${goalId}/map`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/map`} className="underline">
             Goal map
-          </a>
-          <a href={`/goals/${goalId}/reflect`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/reflect`} className="underline">
             Reflect
-          </a>
-          <a href={`/goals/${goalId}/history`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/history`} className="underline">
             History
-          </a>
+          </Link>
         </nav>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-neutral-600">{goal.outcome_statement}</p>
@@ -228,9 +223,9 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
         <h2 id="next-heading" className="text-sm font-medium uppercase tracking-wide text-neutral-500">
           Next action
         </h2>
-        <a href={`/goals/${goalId}/today`} className={buttonClass("primary")}>
+        <Link href={`/goals/${goalId}/today`} className={buttonClass("primary")}>
           Go to today
-        </a>
+        </Link>
       </section>
     </main>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { buttonClass } from "@/components/ui/button-styles";
 
 export default function Error({
@@ -24,9 +25,9 @@ export default function Error({
         <button onClick={() => reset()} className={buttonClass("primary")}>
           Retry
         </button>
-        <a href="/goals" className={buttonClass("secondary")}>
+        <Link href="/goals" className={buttonClass("secondary")}>
           Back to your goals
-        </a>
+        </Link>
       </div>
     </main>
   );

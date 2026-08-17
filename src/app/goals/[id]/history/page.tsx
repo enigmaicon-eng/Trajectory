@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { respondToReplan } from "@/server/actions/adapt";
@@ -69,12 +70,12 @@ export default async function GoalHistoryPage({ params }: { params: Promise<{ id
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
       <div>
         <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <a href={`/goals/${goalId}/today`} className="underline">
+          <Link href={`/goals/${goalId}/today`} className="underline">
             Today
-          </a>
-          <a href={`/goals/${goalId}/reflect`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/reflect`} className="underline">
             Reflect
-          </a>
+          </Link>
         </nav>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-sm text-neutral-500">Plan history & adaptation log</p>

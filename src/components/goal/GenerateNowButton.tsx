@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { retryGeneration } from "@/server/actions/goal";
 import { buttonClass } from "@/components/ui/button-styles";
 
@@ -41,9 +42,9 @@ export function GenerateNowButton({ goalId }: { goalId: string }) {
         <p className="text-neutral-800">
           Still over the free plan&apos;s limit — resets {resetsAt ? formatResetsAt(resetsAt) : "soon"}.
         </p>
-        <a href="/settings/ai" className={`self-start ${buttonClass("primary", "small")}`}>
+        <Link href="/settings/ai" className={`self-start ${buttonClass("primary", "small")}`}>
           Add a key to finish now
-        </a>
+        </Link>
       </div>
     );
   }

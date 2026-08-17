@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
@@ -41,9 +42,9 @@ export default async function GoalWeekPage({
   if (!plan) {
     return (
       <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-16">
-        <a href={`/goals/${goalId}/map`} className="text-sm text-neutral-500 underline">
+        <Link href={`/goals/${goalId}/map`} className="text-sm text-neutral-500 underline">
           ← Goal map
-        </a>
+        </Link>
         <h1 className="text-xl font-medium">{goal.title}</h1>
         <p className="text-sm text-neutral-600">
           This goal doesn&apos;t have an active plan yet — generation may have been interrupted
@@ -98,18 +99,18 @@ export default async function GoalWeekPage({
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
       <div>
         <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <a href={`/goals/${goalId}/today`} className="underline">
+          <Link href={`/goals/${goalId}/today`} className="underline">
             Today
-          </a>
-          <a href={`/goals/${goalId}/map`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/map`} className="underline">
             Goal map
-          </a>
-          <a href={`/goals/${goalId}/reflect`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/reflect`} className="underline">
             Reflect
-          </a>
-          <a href={`/goals/${goalId}/history`} className="underline">
+          </Link>
+          <Link href={`/goals/${goalId}/history`} className="underline">
             History
-          </a>
+          </Link>
         </nav>
         <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
         <p className="mt-1 text-neutral-600">{goal.outcome_statement}</p>
@@ -200,15 +201,15 @@ export default async function GoalWeekPage({
 
       <nav aria-label="Week navigation" className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
         {weekIndex > 0 ? (
-          <a href={`/goals/${goalId}/week?week=${weekIndex - 1}`} className="underline">
+          <Link href={`/goals/${goalId}/week?week=${weekIndex - 1}`} className="underline">
             ← Previous week
-          </a>
+          </Link>
         ) : (
           <span />
         )}
-        <a href={`/goals/${goalId}/week?week=${weekIndex + 1}`} className="underline">
+        <Link href={`/goals/${goalId}/week?week=${weekIndex + 1}`} className="underline">
           Next week →
-        </a>
+        </Link>
       </nav>
     </main>
   );

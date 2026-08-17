@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { updateProfile } from "@/server/actions/settings";
 import { buttonClass } from "@/components/ui/button-styles";
 
@@ -63,9 +64,9 @@ export function AccountSettingsForm({
         <p className="text-sm text-neutral-500">Plan</p>
         <p className="mt-1 font-medium capitalize">{tier === "byok" ? "Your own key" : "Free"}</p>
         {tier === "free" && (
-          <a href="/settings/ai" className="mt-1 inline-block text-sm underline">
+          <Link href="/settings/ai" className="mt-1 inline-block text-sm underline">
             Add your own key to remove generation limits
-          </a>
+          </Link>
         )}
       </div>
 
