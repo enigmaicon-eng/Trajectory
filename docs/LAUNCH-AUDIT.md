@@ -45,6 +45,7 @@ This is the authoritative bar. Status reflects what's actually been exercised, n
 | RLS | ✅ `ENABLE ROW LEVEL SECURITY` + `owner_all` policy present for every user-owned table in the initial migration |
 | Cron auth | ✅ `/api/cron/daily` behind `CRON_SECRET`; `vercel.json` registers the schedule |
 | Security review of this session's diff | ✅ No findings (see below) |
+| Security review of BYOK / AI-provider / cron surface | ✅ Done — found and fixed 1 real issue (see below) |
 | Error monitoring / alerting | ❌ **Gap.** No Sentry/equivalent wired up. `ai_runs` gives cost/usage visibility but nothing pages anyone on an elevated error rate. Not blocking for a single-user beta, but should exist before any real user traffic beyond the founder |
 | Rollback procedure | ⚠️ Implicit only. Vercel's own deploy history gives a rollback path (redeploy previous build), but it's untested and there's no written trigger criteria |
 
@@ -52,7 +53,7 @@ This is the authoritative bar. Status reflects what's actually been exercised, n
 
 Reviewed the `<a>`→`Link` conversion, the contrast fix, and the new Playwright/axe tooling for injection, auth-bypass, secret-exposure, and data-leakage risk. **No findings.** None of it touches auth, RLS, secret handling, or AI I/O — it's navigation semantics, one CSS class, and dev-only test tooling.
 
-This was *not* a full-codebase security audit — it covered only what changed in this session. A pre-launch full-surface pass (BYOK key handling in `src/lib/security/byok-session.ts`, the AI provider abstraction's handling of untrusted model output, and the cron endpoint) is recommended once the live-backend blocker below is cleared, since bugs found during real end-to-end testing may touch those files.
+**Follow-up full-surface pass (BYOK key handling, AI provider abstraction, cron endpoint), done this session:** found one real issue, now fixed. `src/lib/security/redact.ts` exports `redactSecrets()` specifically to strip API keys from provider SDK error text before persistence — its own comment names the exact scenario ("a provider SDK error message that echoes the invalid key") — but it was never called anywhere in the codebase. `src/lib/ai/run.ts` wrote a failed provider call's raw `err.message` straight into `ai_runs.error_code`. Google's Generative Language API embeds the API key in the request URL, so a BYOK user's raw key could have reached that Postgres column un-redacted on a failed call — contradicting the "metadata-only `ai_runs`" / "redaction in logs" guarantee this document's own R9 row promises. Fixed by wiring `redactSecrets()` into that write path (commit `15ff4f9`). Everything else on this surface — `byok-session.ts`'s httpOnly/encrypted/session-only cookie handling, `crypto.ts`'s AES-256-GCM with auth-tag verification, the cron route's bearer-secret gate — checked out clean.
 
 ## 4. Known, accepted gaps (per `PRODUCT-ARCHITECTURE.md` §13)
 
