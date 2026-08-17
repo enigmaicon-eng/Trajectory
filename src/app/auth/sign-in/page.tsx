@@ -53,7 +53,7 @@ export default function SignInPage() {
         </form>
       )}
 
-      <div className="flex items-center gap-3 text-xs text-neutral-400">
+      <div className="flex items-center gap-3 text-xs text-neutral-600">
         <div className="h-px flex-1 bg-neutral-200" />
         or
         <div className="h-px flex-1 bg-neutral-200" />
