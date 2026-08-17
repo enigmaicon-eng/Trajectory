@@ -5,6 +5,7 @@ import type { Database } from "@/lib/db/types.generated";
 import { resolveProvider } from "./registry";
 import { checkAndIncrementUsage } from "@/lib/usage/limits";
 import { AIValidationError } from "./errors";
+import { redactSecrets } from "@/lib/security/redact";
 
 type AiModule = Database["public"]["Enums"]["ai_module"];
 
@@ -95,7 +96,10 @@ export async function runModule<TIn, TOut>(
       }
     } catch (err) {
       status = "provider_error";
-      errorCode = err instanceof Error ? err.message : String(err);
+      // A BYOK caller's raw key can appear in provider SDK error text (e.g.
+      // Google's API embeds it in the request URL) — never persist that
+      // un-redacted (§10, R9: "metadata-only ai_runs").
+      errorCode = redactSecrets(err instanceof Error ? err.message : String(err));
     }
   }
 
