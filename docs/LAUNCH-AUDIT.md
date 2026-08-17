@@ -74,6 +74,11 @@ These are documented product decisions, not launch blockers: single-tenant only,
 
 **Rollback trigger:** if the live end-to-end run in step 1 above surfaces a data-integrity bug (wrong plan, lost evidence, incorrect RLS boundary), do not proceed to real users until it's fixed — everything else found so far has been cosmetic (contrast) or infrastructural (missing E2E tooling), not data-integrity-affecting.
 
+**Rollback procedure (documented here, not yet exercised — needs Vercel dashboard access this session doesn't have):**
+1. Vercel → Project → Deployments → find the last known-good deployment → "Promote to Production." No rebuild needed; takes effect in seconds. This is a code-only rollback — no in-app schema-version gate exists, so it only works cleanly if the bad deploy didn't ship alongside a breaking migration.
+2. If a Supabase migration shipped in the same change and needs reverting too: migrations in `supabase/migrations/` are forward-only (no generated down-migrations) — a revert means hand-writing and applying a new migration that undoes the change, not `supabase db reset`. Riskier than the code rollback, and the reason schema changes deserve more scrutiny than a UI change before shipping.
+3. There is no feature-flag layer — rollback is deploy-level, not per-feature. Acceptable at single-user scale; worth revisiting if real users arrive.
+
 ## 6. Sections intentionally out of scope
 
 Per the adaptation noted at the top: Go-to-Market Readiness (§5) and Organizational Readiness (§6) from the upstream playbook don't apply to a solo-founder v1 with no support team, sales function, or executive sponsor, and are omitted rather than answered with placeholders.
