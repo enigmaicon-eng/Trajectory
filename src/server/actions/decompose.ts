@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/db/types.generated";
 import { runDecompose } from "@/lib/ai/modules/decompose";
 import type { DecomposeInput } from "@/lib/ai/modules/decompose/input.schema";
+import { snapshotGraphRevision } from "@/server/actions/graph-revisions";
 
 type DB = SupabaseClient<Database>;
 
@@ -181,6 +182,8 @@ export async function decomposeGoal(db: DB, goalId: string, userId: string): Pro
     const { error: depsError } = await db.from("node_dependencies").insert(dependencyRows);
     if (depsError) throw new Error(`Failed to persist goal dependencies: ${depsError.message}`);
   }
+
+  await snapshotGraphRevision(db, goalId, userId, "initial");
 
   return {
     milestoneCount: milestoneRows.length,

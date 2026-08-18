@@ -56,7 +56,8 @@ async function loadEligibleProjects(db: DB, goalId: string): Promise<EligiblePro
   const { data: edgeRows, error: edgesError } = await db
     .from("node_dependencies")
     .select("from_node_id, to_node_id, type")
-    .eq("goal_id", goalId);
+    .eq("goal_id", goalId)
+    .is("removed_at", null);
   if (edgesError) throw new Error(edgesError.message);
 
   const nodes = nodeRows ?? [];

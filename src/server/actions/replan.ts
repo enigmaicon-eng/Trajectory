@@ -9,6 +9,7 @@ import { computeAndPersistGoalSignals, type GoalSignalsSummary } from "@/server/
 import { generatePlan } from "@/server/actions/plan";
 import { evaluateReplanTriggers, type DetectedTrigger, type ReplanTriggerKind } from "@/lib/domain/replan";
 import { daysBetween, todayISO } from "@/lib/domain/dates";
+import { snapshotGraphRevision } from "@/server/actions/graph-revisions";
 
 type DB = SupabaseClient<Database>;
 type ReplanTrigger = ReplanInput["trigger"];
@@ -252,6 +253,7 @@ export async function applyPlanPatch(
   goalId: string,
   userId: string,
   ops: PlanOp[],
+  replanEventId?: string,
 ): Promise<ApplyPlanPatchResult> {
   for (const op of ops) {
     switch (op.op) {
@@ -282,7 +284,7 @@ export async function applyPlanPatch(
         if (!op.nodeId) break;
         const { error } = await db
           .from("goal_nodes")
-          .update({ status: "dropped" })
+          .update({ status: "dropped", dropped_at: new Date().toISOString(), dropped_reason: op.reason })
           .eq("id", op.nodeId)
           .eq("goal_id", goalId);
         if (error) throw new Error(error.message);
@@ -303,12 +305,18 @@ export async function applyPlanPatch(
       }
       case "remove_dependency": {
         if (!op.fromNodeId || !op.toNodeId) break;
+        // Soft-delete (§4.2 v2): the graph is append-only, so an edge is
+        // marked removed rather than deleted. This also frees its
+        // (from, to, type) slot — via the partial unique index that only
+        // covers live rows — for a later add_dependency to re-add the same
+        // edge without a constraint conflict.
         const { error } = await db
           .from("node_dependencies")
-          .delete()
+          .update({ removed_at: new Date().toISOString(), removed_reason: op.reason ?? null })
           .eq("goal_id", goalId)
           .eq("from_node_id", op.fromNodeId)
-          .eq("to_node_id", op.toNodeId);
+          .eq("to_node_id", op.toNodeId)
+          .is("removed_at", null);
         if (error) throw new Error(error.message);
         break;
       }
@@ -361,6 +369,8 @@ export async function applyPlanPatch(
       }
     }
   }
+
+  await snapshotGraphRevision(db, goalId, userId, "replan", replanEventId);
 
   const result = await generatePlan(db, goalId, userId);
   return { planId: result.planId };

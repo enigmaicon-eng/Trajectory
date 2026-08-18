@@ -71,7 +71,7 @@ export async function respondToReplan(input: z.infer<typeof respondToReplanSchem
   }
 
   const patch = event.patch as { ops: PlanOp[] };
-  const { planId } = await applyPlanPatch(db, event.goal_id, user.id, patch.ops);
+  const { planId } = await applyPlanPatch(db, event.goal_id, user.id, patch.ops, event.id);
 
   const { error } = await db
     .from("replan_events")

@@ -121,11 +121,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "capacity_profiles_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "capacity_profiles_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -168,11 +168,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "checkins_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "checkins_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -215,11 +215,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "constraints_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "constraints_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -265,28 +265,28 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "evidence_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "evidence_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
-            foreignKeyName: "evidence_node_id_fkey"
+            foreignKeyName: "evidence_node_fk"
             columns: ["node_id"]
             isOneToOne: false
             referencedRelation: "goal_nodes"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "evidence_task_id_fkey"
+            foreignKeyName: "evidence_task_fk"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "evidence_weekly_outcome_id_fkey"
+            foreignKeyName: "evidence_outcome_fk"
             columns: ["weekly_outcome_id"]
             isOneToOne: false
             referencedRelation: "weekly_outcomes"
@@ -333,11 +333,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "feasibility_assessments_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "feasibility_assessments_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -374,11 +374,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "goal_intake_goal_id_fkey"
-            columns: ["goal_id"]
-            isOneToOne: true
+            foreignKeyName: "goal_intake_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
+            isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -386,11 +386,14 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string
+          dropped_at: string | null
+          dropped_reason: string | null
           estimated_minutes: number | null
           goal_id: string
           health: Database["public"]["Enums"]["node_health"]
           id: string
           kind: Database["public"]["Enums"]["node_kind"]
+          origin: Database["public"]["Enums"]["node_origin"]
           parent_id: string | null
           sequence: number
           status: Database["public"]["Enums"]["node_status"]
@@ -404,11 +407,14 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          dropped_at?: string | null
+          dropped_reason?: string | null
           estimated_minutes?: number | null
           goal_id: string
           health?: Database["public"]["Enums"]["node_health"]
           id?: string
           kind: Database["public"]["Enums"]["node_kind"]
+          origin?: Database["public"]["Enums"]["node_origin"]
           parent_id?: string | null
           sequence?: number
           status?: Database["public"]["Enums"]["node_status"]
@@ -422,11 +428,14 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          dropped_at?: string | null
+          dropped_reason?: string | null
           estimated_minutes?: number | null
           goal_id?: string
           health?: Database["public"]["Enums"]["node_health"]
           id?: string
           kind?: Database["public"]["Enums"]["node_kind"]
+          origin?: Database["public"]["Enums"]["node_origin"]
           parent_id?: string | null
           sequence?: number
           status?: Database["public"]["Enums"]["node_status"]
@@ -439,11 +448,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "goal_nodes_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "goal_nodes_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "goal_nodes_parent_id_fkey"
@@ -499,11 +508,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "goal_signals_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "goal_signals_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
         ]
       }
@@ -555,6 +564,54 @@ export type Database = {
         }
         Relationships: []
       }
+      graph_revisions: {
+        Row: {
+          created_at: string
+          goal_id: string
+          id: string
+          reason: string
+          replan_event_id: string | null
+          revision: number
+          snapshot: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          goal_id: string
+          id?: string
+          reason: string
+          replan_event_id?: string | null
+          revision: number
+          snapshot: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          goal_id?: string
+          id?: string
+          reason?: string
+          replan_event_id?: string | null
+          revision?: number
+          snapshot?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_revisions_goal_id_user_id_fkey"
+            columns: ["goal_id", "user_id"]
+            isOneToOne: false
+            referencedRelation: "goals"
+            referencedColumns: ["id", "user_id"]
+          },
+          {
+            foreignKeyName: "graph_revisions_replan_event_id_fkey"
+            columns: ["replan_event_id"]
+            isOneToOne: false
+            referencedRelation: "replan_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       node_dependencies: {
         Row: {
           created_at: string
@@ -562,6 +619,8 @@ export type Database = {
           goal_id: string
           id: string
           rationale: string | null
+          removed_at: string | null
+          removed_reason: string | null
           to_node_id: string
           type: Database["public"]["Enums"]["dependency_type"]
           user_id: string
@@ -572,6 +631,8 @@ export type Database = {
           goal_id: string
           id?: string
           rationale?: string | null
+          removed_at?: string | null
+          removed_reason?: string | null
           to_node_id: string
           type?: Database["public"]["Enums"]["dependency_type"]
           user_id: string
@@ -582,6 +643,8 @@ export type Database = {
           goal_id?: string
           id?: string
           rationale?: string | null
+          removed_at?: string | null
+          removed_reason?: string | null
           to_node_id?: string
           type?: Database["public"]["Enums"]["dependency_type"]
           user_id?: string
@@ -595,11 +658,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "node_dependencies_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "node_dependencies_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "node_dependencies_to_node_id_fkey"
@@ -646,11 +709,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "plan_weeks_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "plan_weeks_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "plan_weeks_plan_id_fkey"
@@ -706,11 +769,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "plans_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "plans_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "plans_supersedes_id_fkey"
@@ -787,11 +850,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "reflections_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "reflections_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "reflections_plan_week_id_fkey"
@@ -854,11 +917,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "replan_events_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "replan_events_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "replan_events_to_plan_id_fkey"
@@ -936,11 +999,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "tasks_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "tasks_plan_week_id_fkey"
@@ -1061,11 +1124,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "weekly_outcomes_goal_id_fkey"
-            columns: ["goal_id"]
+            foreignKeyName: "weekly_outcomes_goal_owner_fk"
+            columns: ["goal_id", "user_id"]
             isOneToOne: false
             referencedRelation: "goals"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "user_id"]
           },
           {
             foreignKeyName: "weekly_outcomes_plan_week_id_fkey"
@@ -1130,6 +1193,7 @@ export type Database = {
         | "rescoped"
       node_health: "on_track" | "at_risk" | "off_track" | "unknown"
       node_kind: "milestone" | "project"
+      node_origin: "ai" | "user" | "ai_edited"
       node_status:
         | "not_started"
         | "in_progress"
@@ -1313,6 +1377,7 @@ export const Constants = {
       ],
       node_health: ["on_track", "at_risk", "off_track", "unknown"],
       node_kind: ["milestone", "project"],
+      node_origin: ["ai", "user", "ai_edited"],
       node_status: [
         "not_started",
         "in_progress",
