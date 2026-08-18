@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/db/admin";
 import { evaluateAndProposeReplans } from "@/server/actions/replan";
 import { advanceCurrentWeek } from "@/server/actions/plan";
+import { env } from "@/lib/env/server";
 
 /**
  * §8.3 scheduled work — service-role authenticated, once daily. No AI runs
@@ -11,7 +12,7 @@ import { advanceCurrentWeek } from "@/server/actions/plan";
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

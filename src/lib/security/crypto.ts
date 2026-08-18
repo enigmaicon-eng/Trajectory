@@ -1,18 +1,16 @@
 import "server-only";
 import { randomBytes, createCipheriv, createDecipheriv } from "node:crypto";
+import { env } from "@/lib/env/server";
 
 // §10: AES-256-GCM via Node crypto, key from BYOK_ENCRYPTION_KEY (32 bytes,
 // base64). Originally specified for encrypting `user_credentials` at rest;
 // repurposed here to encrypt the session-scoped BYOK cookie instead (see
 // `byok-session.ts` and project memory "ai-provider-strategy" for why BYOK
 // keys are never persisted server-side in v1).
-
+//
+// Format (32 decoded bytes) is validated once at startup by lib/env/server.ts.
 function key(): Buffer {
-  const b64 = process.env.BYOK_ENCRYPTION_KEY;
-  if (!b64) throw new Error("BYOK_ENCRYPTION_KEY is not set");
-  const buf = Buffer.from(b64, "base64");
-  if (buf.length !== 32) throw new Error("BYOK_ENCRYPTION_KEY must decode to 32 bytes");
-  return buf;
+  return Buffer.from(env.BYOK_ENCRYPTION_KEY, "base64");
 }
 
 /** iv.ciphertext.authTag, each base64url. */

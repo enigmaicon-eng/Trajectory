@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { env } from "@/lib/env/server";
 
 // Pre-auth goal drafts have nowhere to live in Postgres — every drafts-adjacent
 // table (goals, goal_intake, feasibility_assessments) FKs to auth.users, and
@@ -9,14 +10,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const COOKIE_NAME = "trajectory_draft";
 const MAX_AGE_SECONDS = 60 * 30;
 
-function secret(): string {
-  const value = process.env.DRAFT_TOKEN_SECRET;
-  if (!value) throw new Error("DRAFT_TOKEN_SECRET is not set");
-  return value;
-}
-
 function sign(payload: string): string {
-  return createHmac("sha256", secret()).update(payload).digest("base64url");
+  return createHmac("sha256", env.DRAFT_TOKEN_SECRET).update(payload).digest("base64url");
 }
 
 export function encodeDraftToken(data: unknown): string {

@@ -7,6 +7,7 @@ import type {
   TextRequest,
   TextResult,
 } from "../provider";
+import { env } from "@/lib/env/server";
 
 // The only complete AIProvider implementation in v1. Calls Google's
 // Generative Language API directly with a free-tier API key — not routed
@@ -14,9 +15,9 @@ import type {
 // credits) behind a billing card on the Vercel team. BYOK providers (Phase
 // 6) may still go through the gateway; this one intentionally doesn't.
 function google(apiKey?: string) {
-  const key = apiKey ?? process.env.GEMINI_API_KEY;
-  if (!key) throw new Error("GEMINI_API_KEY is not set");
-  return createGoogleGenerativeAI({ apiKey: key });
+  // BYOK keys are per-user secrets decrypted at request time (registry.ts),
+  // never part of the validated startup env — only the platform fallback is.
+  return createGoogleGenerativeAI({ apiKey: apiKey ?? env.GEMINI_API_KEY });
 }
 
 export class GeminiProvider implements AIProvider {
