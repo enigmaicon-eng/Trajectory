@@ -9,7 +9,7 @@ export default function Loading() {
       </div>
       <ul className="flex flex-col gap-4">
         {[0, 1, 2].map((i) => (
-          <li key={i} className="rounded-md border border-neutral-200 p-4">
+          <li key={i} className="rounded-md border border-rule p-4">
             <SkeletonBlock className="h-5 w-2/3" />
             <SkeletonBlock className="mt-2 h-4 w-full" />
             <SkeletonBlock className="mt-3 h-3 w-16" />

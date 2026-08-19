@@ -54,20 +54,20 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
       {PROVIDERS.map(({ id, label, live }) => {
         const configuredHint = hint(id);
         return (
-          <div key={id} className="rounded-md border border-neutral-200 p-4">
+          <div key={id} className="rounded-md border border-rule p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="font-medium">{label}</p>
                 {!live && (
-                  <p className="mt-1 text-xs uppercase tracking-wide text-neutral-500">
+                  <p className="mt-1 text-xs uppercase tracking-wide text-ink-muted">
                     Coming soon
                   </p>
                 )}
                 {live && configuredHint && (
-                  <p className="mt-1 text-sm text-neutral-600">Key on file: {configuredHint}</p>
+                  <p className="mt-1 text-sm text-ink-muted">Key on file: {configuredHint}</p>
                 )}
                 {live && !configuredHint && (
-                  <p className="mt-1 text-sm text-neutral-600">No key set — using the free tier.</p>
+                  <p className="mt-1 text-sm text-ink-muted">No key set — using the free tier.</p>
                 )}
               </div>
 
@@ -112,7 +112,7 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
                   onChange={(e) => setDraft(e.target.value)}
                   placeholder={`${label} API key`}
                   disabled={busy}
-                  className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500"
+                  className="rounded-md border border-rule px-3 py-2 text-sm outline-none focus-visible:border-ink"
                 />
                 <div className="flex gap-2">
                   <button
@@ -134,13 +134,13 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
                     Cancel
                   </button>
                 </div>
-                {error && <p className="text-sm text-red-600">{error}</p>}
+                {error && <p className="text-sm text-danger-ink">{error}</p>}
               </form>
             )}
           </div>
         );
       })}
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-ink-muted">
         Your key is held for this browser session only and is never stored in our database.
         Closing your browser clears it.
       </p>

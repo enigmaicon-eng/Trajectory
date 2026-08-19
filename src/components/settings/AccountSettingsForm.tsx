@@ -60,8 +60,8 @@ export function AccountSettingsForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="rounded-md border border-neutral-200 p-4">
-        <p className="text-sm text-neutral-500">Plan</p>
+      <div className="rounded-md border border-rule p-4">
+        <p className="text-sm text-ink-muted">Plan</p>
         <p className="mt-1 font-medium capitalize">{tier === "byok" ? "Your own key" : "Free"}</p>
         {tier === "free" && (
           <Link href="/settings/ai" className="mt-1 inline-block text-sm underline">
@@ -80,7 +80,7 @@ export function AccountSettingsForm({
             setStatus("idle");
           }}
           placeholder="Optional"
-          className="rounded-md border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-500"
+          className="rounded-md border border-rule px-3 py-2 outline-none focus-visible:border-ink"
         />
       </label>
 
@@ -92,7 +92,7 @@ export function AccountSettingsForm({
             setTimezone(e.target.value);
             setStatus("idle");
           }}
-          className="rounded-md border border-neutral-300 px-3 py-2 outline-none focus:border-neutral-500"
+          className="rounded-md border border-rule px-3 py-2 outline-none focus-visible:border-ink"
         >
           {!timezones.includes(timezone) && <option value={timezone}>{timezone}</option>}
           {timezones.map((tz) => (
@@ -101,7 +101,7 @@ export function AccountSettingsForm({
             </option>
           ))}
         </select>
-        <span className="text-xs text-neutral-500">
+        <span className="text-xs text-ink-muted">
           Used to figure out your day and week boundaries.
         </span>
       </label>
@@ -114,9 +114,9 @@ export function AccountSettingsForm({
         >
           {status === "saving" ? "Saving..." : "Save changes"}
         </button>
-        {status === "saved" && <span className="text-sm text-neutral-500">Saved.</span>}
+        {status === "saved" && <span className="text-sm text-ink-muted">Saved.</span>}
         {status === "error" && (
-          <span className="text-sm text-red-600">Couldn&apos;t save. Try again.</span>
+          <span className="text-sm text-danger-ink">Couldn&apos;t save. Try again.</span>
         )}
       </div>
     </form>

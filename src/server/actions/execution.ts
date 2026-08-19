@@ -63,6 +63,28 @@ export async function completeTask(input: z.infer<typeof completeTaskSchema>) {
   revalidatePath(`/goals/${task.goal_id}/week`);
 }
 
+const undoTaskCompletionSchema = z.object({ taskId: z.string().uuid() });
+
+/** §9.6: completion is reversible on the row itself, with no time limit. */
+export async function undoTaskCompletion(input: z.infer<typeof undoTaskCompletionSchema>) {
+  const { taskId } = undoTaskCompletionSchema.parse(input);
+  const { db } = await requireUser();
+
+  const { data: task, error: taskError } = await db
+    .from("tasks")
+    .select("id, goal_id, status")
+    .eq("id", taskId)
+    .single();
+  if (taskError || !task) throw new Error("Task not found");
+  if (task.status !== "done") throw new Error("This task isn't marked done.");
+
+  const { error } = await db.from("tasks").update({ status: "pending", completed_at: null }).eq("id", taskId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/goals/${task.goal_id}/today`);
+  revalidatePath(`/goals/${task.goal_id}/week`);
+}
+
 const skipTaskSchema = z.object({ taskId: z.string().uuid(), reason: z.string().max(300).optional() });
 
 export async function skipTask(input: z.infer<typeof skipTaskSchema>) {
@@ -208,9 +230,24 @@ const submitCheckInSchema = z.object({
   note: z.string().max(500).optional(),
 });
 
+/**
+ * §10.1: two check-ins a day (forward: minutes available + energy; evening:
+ * energy + note) share one `checkins` row per (goal, kind, day) — the unique
+ * constraint doesn't distinguish them. A plain upsert of only the fields one
+ * variant asks for would null out whatever the other variant already saved
+ * that same day, so this reads the existing row first and merges.
+ */
 export async function submitCheckIn(input: z.infer<typeof submitCheckInSchema>) {
   const parsed = submitCheckInSchema.parse(input);
   const { db, user } = await requireUser();
+
+  const { data: existing } = await db
+    .from("checkins")
+    .select("minutes_available, minutes_spent, energy, note")
+    .eq("goal_id", parsed.goalId)
+    .eq("kind", parsed.kind)
+    .eq("occurred_on", parsed.occurredOn)
+    .maybeSingle();
 
   const { error } = await db
     .from("checkins")
@@ -220,10 +257,10 @@ export async function submitCheckIn(input: z.infer<typeof submitCheckInSchema>) 
         user_id: user.id,
         kind: parsed.kind,
         occurred_on: parsed.occurredOn,
-        minutes_available: parsed.minutesAvailable ?? null,
-        minutes_spent: parsed.minutesSpent ?? null,
-        energy: parsed.energy ?? null,
-        note: parsed.note ?? null,
+        minutes_available: parsed.minutesAvailable ?? existing?.minutes_available ?? null,
+        minutes_spent: parsed.minutesSpent ?? existing?.minutes_spent ?? null,
+        energy: parsed.energy ?? existing?.energy ?? null,
+        note: parsed.note ?? existing?.note ?? null,
       },
       { onConflict: "goal_id,kind,occurred_on" },
     );

@@ -24,7 +24,7 @@ export default async function StartPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-8 px-6 py-16">
+    <main id="main" className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-8 px-6 py-16">
       <OnboardingFlow initialDraft={draft} />
     </main>
   );

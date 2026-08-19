@@ -8,31 +8,15 @@ import { todayISO } from "@/lib/domain/dates";
 import type { Database } from "@/lib/db/types.generated";
 import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
 import { buttonClass } from "@/components/ui/button-styles";
+import { StandingAnswer } from "@/components/ui/StandingAnswer";
+import { HealthMark } from "@/components/ui/HealthMark";
+import { formatMinutes, formatPercent, formatDateHuman } from "@/lib/format";
 
 type NodeHealth = Database["public"]["Enums"]["node_health"];
 type SignalField = { value: number | string; basis: string; caveat?: string | null } | { caveat: string };
 
 function hasValue(field: SignalField | undefined): field is { value: number | string; basis: string; caveat?: string | null } {
   return !!field && "value" in field;
-}
-
-function formatPercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-const RISK_LABEL: Record<NodeHealth, string> = {
-  on_track: "On track",
-  at_risk: "At risk",
-  off_track: "Off track",
-  unknown: "Not enough data",
-};
-
-function RiskBadge({ risk }: { risk: NodeHealth }) {
-  return (
-    <span className="rounded-full border border-neutral-400 px-2 py-0.5 text-xs uppercase tracking-wide text-neutral-700">
-      {RISK_LABEL[risk]}
-    </span>
-  );
 }
 
 export default async function GoalOverviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -46,7 +30,7 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
 
   const { data: goal } = await db
     .from("goals")
-    .select("id, title, outcome_statement, status, horizon_weeks, target_date")
+    .select("id, title, outcome_statement, status, horizon_weeks, target_date, started_on")
     .eq("id", goalId)
     .maybeSingle();
   if (!goal) notFound();
@@ -64,14 +48,17 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
     .from("goal_nodes")
     .select("id, kind, parent_id, title, target_date, sequence, status, estimated_minutes")
     .eq("goal_id", goalId)
+    .neq("status", "dropped")
     .order("sequence", { ascending: true });
   const nodes = nodeRows ?? [];
   const milestones = nodes.filter((n) => n.kind === "milestone");
+  const projects = nodes.filter((n) => n.kind === "project");
 
   const { data: edgeRows } = await db
     .from("node_dependencies")
     .select("from_node_id, to_node_id, type")
-    .eq("goal_id", goalId);
+    .eq("goal_id", goalId)
+    .is("removed_at", null);
   const edges = edgeRows ?? [];
 
   const { data: capacityRow } = await db
@@ -114,63 +101,120 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
     }),
   );
 
-  return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
-      <div>
-        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <Link href={`/goals/${goalId}/today`} className="underline">
-            Today
-          </Link>
-          <Link href={`/goals/${goalId}/week`} className="underline">
-            This week
-          </Link>
-          <Link href={`/goals/${goalId}/map`} className="underline">
-            Goal map
-          </Link>
-          <Link href={`/goals/${goalId}/reflect`} className="underline">
-            Reflect
-          </Link>
-          <Link href={`/goals/${goalId}/history`} className="underline">
-            History
-          </Link>
-        </nav>
-        <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
-        <p className="mt-1 text-neutral-600">{goal.outcome_statement}</p>
-        <span className="mt-2 inline-block text-xs uppercase tracking-wide text-neutral-500">{goal.status}</span>
-      </div>
+  const totalProjectMinutes = projects.reduce((sum, p) => sum + (p.estimated_minutes ?? 0), 0);
+  const completedProjectMinutes = projects
+    .filter((p) => p.status === "complete")
+    .reduce((sum, p) => sum + (p.estimated_minutes ?? 0), 0);
+  const workDonePct = totalProjectMinutes > 0 ? completedProjectMinutes / totalProjectMinutes : 0;
+  const milestonesComplete = milestones.filter((m) => m.status === "complete").length;
 
-      <section aria-labelledby="signals-heading" className="flex flex-col gap-4">
-        <h2 id="signals-heading" className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Signals
+  const bottleneckNode = nodes.find(
+    (n) => n.kind === "project" && criticalNodeIds.has(n.id) && n.status !== "complete",
+  );
+
+  let standingLine1: string;
+  if (nodes.length === 0) {
+    standingLine1 = "Nothing is complete yet — the roadmap is still being built.";
+  } else if (signalsRow?.projected_completion_date) {
+    const target = goal.target_date;
+    const projected = signalsRow.projected_completion_date;
+    const onTime = target ? projected <= target : true;
+    standingLine1 = `${formatPercent(workDonePct)} of the work is done. ${
+      onTime ? `On pace for ${formatDateHuman(projected)}.` : `Projected for ${formatDateHuman(projected)}, past your ${formatDateHuman(target as string)} target.`
+    }`;
+  } else {
+    standingLine1 = `${formatPercent(workDonePct)} of the work is done.`;
+  }
+
+  const { data: recentEvidenceRows } = await db
+    .from("evidence")
+    .select("id, task_id, kind, url, created_at")
+    .eq("goal_id", goalId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const evidenceByTaskId = new Map<string, { kind: string; url: string | null }>();
+  for (const ev of recentEvidenceRows ?? []) {
+    if (ev.task_id && !evidenceByTaskId.has(ev.task_id)) evidenceByTaskId.set(ev.task_id, { kind: ev.kind, url: ev.url });
+  }
+
+  const { data: recentTasks } = await db
+    .from("tasks")
+    .select("id, title, effort_minutes, completed_at")
+    .eq("goal_id", goalId)
+    .eq("status", "done")
+    .order("completed_at", { ascending: false })
+    .limit(8);
+
+  const SIGNAL_ROWS = [
+    ["Execution rate", explanation?.executionRate, (v: number | string) => formatPercent(v as number)],
+    ["Momentum", explanation?.momentum, (v: number | string) => `${v}`],
+    ["Plan confidence", explanation?.planConfidence, (v: number | string) => formatPercent(v as number)],
+    ["Risk", explanation?.riskLevel, (v: number | string) => v as string],
+    ["Projected finish", explanation?.projectedCompletion, (v: number | string) => formatDateHuman(v as string)],
+  ] as const;
+
+  return (
+    <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
+      <StandingAnswer line1={standingLine1} />
+
+      <section aria-labelledby="outcomes-heading" className="flex flex-col gap-3">
+        <h2 id="outcomes-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+          Outcomes
         </h2>
-        {!signalsRow ? (
-          <p className="text-sm text-neutral-600">
-            Not enough data yet — signals appear after a few days of activity on this goal.
+        {milestones.length === 0 ? (
+          <p className="text-sm text-ink-muted">
+            Nothing is complete yet — the roadmap is still being built.
           </p>
         ) : (
-          <dl className="grid grid-cols-2 gap-6 sm:grid-cols-3">
-            {(
-              [
-                ["Momentum", explanation?.momentum, (v: number | string) => formatPercent(v as number)],
-                ["Execution rate", explanation?.executionRate, (v: number | string) => formatPercent(v as number)],
-                ["Plan confidence", explanation?.planConfidence, (v: number | string) => formatPercent(v as number)],
-                ["Risk", explanation?.riskLevel, (v: number | string) => RISK_LABEL[v as NodeHealth] ?? String(v)],
-                [
-                  "Projected completion",
-                  explanation?.projectedCompletion,
-                  (v: number | string) => String(v),
-                ],
-              ] as const
-            ).map(([label, field, format]) => (
-              <div key={label}>
-                <dt className="text-sm text-neutral-500">{label}</dt>
+          <>
+            <p className="text-sm text-ink">
+              {milestonesComplete} of {milestones.length} milestones complete
+            </p>
+            <div className="h-1.5 w-full rounded-full bg-rule" role="img" aria-label={`${formatPercent(workDonePct)} of work complete`}>
+              <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.round(workDonePct * 100)}%` }} />
+            </div>
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-muted">
+              {milestones.map((m, i) => {
+                const risk = milestoneRisks.get(m.id);
+                return (
+                  <span key={m.id} className="inline-flex items-center gap-1.5">
+                    {m.title}
+                    {risk && <HealthMark health={m.status === "complete" ? ("on_track" as NodeHealth) : risk.risk} />}
+                    {i < milestones.length - 1 && <span aria-hidden="true">·</span>}
+                  </span>
+                );
+              })}
+            </p>
+          </>
+        )}
+      </section>
+
+      <section aria-labelledby="signals-heading" className="flex flex-col gap-3">
+        <h2 id="signals-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+          How it&apos;s going
+        </h2>
+        {!signalsRow ? (
+          <p className="text-sm text-ink-muted">
+            Not enough data yet. After seven days of execution, these become meaningful.
+          </p>
+        ) : (
+          <dl className="flex flex-col">
+            {SIGNAL_ROWS.map(([label, field, format]) => (
+              <div key={label} className="flex items-center justify-between gap-4 border-b border-rule py-2 last:border-b-0">
+                <dt className="text-sm text-ink-muted">{label}</dt>
                 {hasValue(field) ? (
-                  <>
-                    <dd className="font-medium tabular-nums">{format(field.value)}</dd>
-                    <p className="mt-0.5 text-xs text-neutral-500">{field.basis}</p>
-                  </>
+                  <details className="group text-right">
+                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm">
+                      <span className="font-medium tabular-nums text-ink">{format(field.value)}</span>
+                      <span aria-hidden="true" className="text-ink-faint">
+                        ⓘ
+                      </span>
+                    </summary>
+                    <p className="mt-1 max-w-xs text-xs text-ink-muted">{field.basis}</p>
+                    {field.caveat && <p className="text-xs text-ink-faint">{field.caveat}</p>}
+                  </details>
                 ) : (
-                  <dd className="text-sm text-neutral-500">{field?.caveat ?? "Not enough data"}</dd>
+                  <dd className="text-sm text-ink-faint">{field?.caveat ?? "not enough data"}</dd>
                 )}
               </div>
             ))}
@@ -178,55 +222,56 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
         )}
       </section>
 
-      <section aria-labelledby="milestones-heading" className="flex flex-col gap-4">
-        <h2 id="milestones-heading" className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Milestone timeline
-        </h2>
-        {nodes.length === 0 ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-neutral-600">
-              This goal doesn&apos;t have a plan yet — generation may have been interrupted (often a temporary
-              generation limit).
-            </p>
-            <GenerateNowButton goalId={goalId} />
-          </div>
-        ) : (
-          <ol className="flex flex-col gap-3">
-            {milestones.map((m) => {
-              const risk = milestoneRisks.get(m.id);
-              const isCritical = criticalNodeIds.has(m.id);
+      {bottleneckNode && (
+        <section aria-labelledby="bottleneck-heading" className="flex flex-col gap-2 border-t border-rule pt-6">
+          <h2 id="bottleneck-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+            The bottleneck
+          </h2>
+          <p className="text-sm text-ink">{bottleneckNode.title} is on the critical path and not yet done.</p>
+          <Link href={`/goals/${goalId}/today`} className={`self-start ${buttonClass("secondary", "small")}`}>
+            Open in Today
+          </Link>
+        </section>
+      )}
+
+      {(recentTasks ?? []).length > 0 && (
+        <section aria-labelledby="record-heading" className="flex flex-col gap-3 border-t border-rule pt-6">
+          <h2 id="record-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+            What you&apos;ve done
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {(recentTasks ?? []).map((t) => {
+              const ev = evidenceByTaskId.get(t.id);
               return (
-                <li
-                  key={m.id}
-                  className={`rounded-md border p-4 ${isCritical ? "border-l-4 border-neutral-900" : "border-neutral-200"}`}
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium">{m.title}</span>
-                    <div className="flex items-center gap-2 text-xs text-neutral-500">
-                      {isCritical && (
-                        <span className="rounded-full border border-neutral-400 px-2 py-0.5 uppercase tracking-wide text-neutral-700">
-                          Critical path
-                        </span>
-                      )}
-                      {risk && <RiskBadge risk={risk.risk} />}
-                      {m.target_date && <span>{m.target_date}</span>}
-                    </div>
-                  </div>
+                <li key={t.id} className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+                  <span className="text-ink-muted">
+                    {t.completed_at ? formatDateHuman(t.completed_at.slice(0, 10)) : ""}{" "}
+                    <span className="text-ink">{t.title}</span>
+                  </span>
+                  <span className="flex items-center gap-2 tabular-nums text-ink-muted">
+                    {formatMinutes(t.effort_minutes)} est
+                    {ev?.url && (
+                      <a href={ev.url} target="_blank" rel="noreferrer" className="text-accent underline decoration-rule underline-offset-2">
+                        ↗ link
+                      </a>
+                    )}
+                  </span>
                 </li>
               );
             })}
-          </ol>
-        )}
-      </section>
+          </ul>
+        </section>
+      )}
 
-      <section aria-labelledby="next-heading" className="flex flex-col gap-4">
-        <h2 id="next-heading" className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Next action
-        </h2>
-        <Link href={`/goals/${goalId}/today`} className={buttonClass("primary")}>
-          Go to today
-        </Link>
-      </section>
+      {nodes.length === 0 && (
+        <div className="flex flex-col gap-3">
+          <GenerateNowButton goalId={goalId} />
+        </div>
+      )}
+
+      <Link href={`/goals/${goalId}/today`} className={buttonClass("primary")}>
+        Go to today
+      </Link>
     </main>
   );
 }

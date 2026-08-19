@@ -14,18 +14,18 @@ export default async function AiSettingsPage() {
   const status = await listByokStatus();
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
-      <nav aria-label="Settings" className="flex gap-4 text-sm text-neutral-500">
-        <Link href="/goals" className="underline">
+    <main id="main" className="mx-auto flex min-h-screen max-w-xl flex-col gap-6 px-6 py-16">
+      <nav aria-label="Settings" className="flex gap-4 text-sm text-ink-muted">
+        <Link href="/goals" className="underline decoration-rule underline-offset-2 hover:text-ink">
           ← Your goals
         </Link>
-        <Link href="/settings/account" className="underline">
+        <Link href="/settings/account" className="underline decoration-rule underline-offset-2 hover:text-ink">
           Account
         </Link>
       </nav>
       <div>
-        <h1 className="text-xl font-medium">Provider keys</h1>
-        <p className="mt-2 text-sm text-neutral-600">
+        <h1 className="text-[28px] font-normal leading-tight tracking-tight text-ink">Provider keys</h1>
+        <p className="mt-2 text-sm text-ink-muted">
           Trajectory runs on a shared free tier by default. Add your own key to remove the
           generation limits and use your own quota.
         </p>

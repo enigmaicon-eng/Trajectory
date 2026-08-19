@@ -16,9 +16,9 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-start justify-center gap-4 px-6 py-16">
-      <h1 className="text-xl font-medium">Something went wrong</h1>
-      <p className="text-sm text-neutral-600">
+    <main id="main" className="mx-auto flex min-h-screen max-w-xl flex-col items-start justify-center gap-4 px-6 py-16">
+      <h1 className="text-[28px] font-normal leading-tight tracking-tight text-ink">Something on our side failed</h1>
+      <p className="text-sm text-ink-muted">
         We hit a snag loading this. Nothing you did caused it, and nothing was lost.
       </p>
       <div className="flex gap-3">

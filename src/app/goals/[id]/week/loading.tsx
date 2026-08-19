@@ -13,7 +13,7 @@ export default function Loading() {
         <SkeletonBlock className="mt-3 h-6 w-1/2" />
         <SkeletonBlock className="mt-2 h-4 w-3/4" />
       </div>
-      <div className="flex items-baseline justify-between gap-4 border-b border-neutral-200 pb-6">
+      <div className="flex items-baseline justify-between gap-4 border-b border-rule pb-6">
         <SkeletonBlock className="h-6 w-40" />
         <div className="flex gap-6">
           <SkeletonBlock className="h-8 w-20" />
@@ -22,7 +22,7 @@ export default function Loading() {
       </div>
       <ol className="flex flex-col gap-6">
         {[0, 1, 2].map((i) => (
-          <li key={i} className="rounded-md border border-neutral-200 p-4">
+          <li key={i} className="rounded-md border border-rule p-4">
             <SkeletonBlock className="h-5 w-2/3" />
             <SkeletonBlock className="mt-2 h-4 w-full" />
           </li>

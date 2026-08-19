@@ -121,7 +121,7 @@ export function CommandPalette() {
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-full max-w-md rounded-lg border border-neutral-200 bg-white shadow-lg"
+        className="w-full max-w-md rounded-lg border border-rule bg-paper-raised shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <input
@@ -132,11 +132,11 @@ export function CommandPalette() {
           onKeyDown={handleInputKeyDown}
           placeholder="Go to..."
           aria-label="Search destinations"
-          className="w-full border-b border-neutral-200 px-4 py-3 text-sm outline-none"
+          className="w-full border-b border-rule bg-paper-raised px-4 py-3 text-base text-ink outline-none"
         />
         <ul role="listbox" className="max-h-72 overflow-y-auto py-2">
           {filtered.length === 0 && (
-            <li className="px-4 py-2 text-sm text-neutral-500">No matches</li>
+            <li className="px-4 py-2 text-sm text-ink-muted">No matches</li>
           )}
           {filtered.map((d, i) => (
             <li key={d.href} role="option" aria-selected={i === activeIndex}>
@@ -144,8 +144,8 @@ export function CommandPalette() {
                 type="button"
                 onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => go(d.href)}
-                className={`flex min-h-11 w-full items-center px-4 text-left text-sm ${
-                  i === activeIndex ? "bg-neutral-100" : ""
+                className={`flex min-h-11 w-full items-center px-4 text-left text-sm text-ink ${
+                  i === activeIndex ? "bg-paper" : ""
                 }`}
               >
                 {d.label}

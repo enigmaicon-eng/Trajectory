@@ -4,12 +4,8 @@ import { createClient } from "@/lib/db/server";
 import { submitReflection } from "@/server/actions/reflect";
 import { requestReplan } from "@/server/actions/adapt";
 import { buttonClass } from "@/components/ui/button-styles";
-
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${hours}h`;
-}
+import { StandingAnswer } from "@/components/ui/StandingAnswer";
+import { formatMinutes } from "@/lib/format";
 
 type Synthesis = { summary?: string; patterns?: string[]; recommendation?: string; confidence?: number };
 
@@ -41,12 +37,12 @@ export default async function GoalReflectPage({
 
   if (!plan) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-16">
-        <Link href={`/goals/${goalId}/today`} className="text-sm text-neutral-500 underline">
+      <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 px-6 py-16">
+        <StandingAnswer line1="Nothing to reflect on yet." />
+        <p className="text-sm text-ink-muted">There&apos;s no active plan on record for this goal.</p>
+        <Link href={`/goals/${goalId}/today`} className="text-sm text-ink underline decoration-rule underline-offset-2 hover:text-accent">
           ← Today
         </Link>
-        <h1 className="text-xl font-medium">{goal.title}</h1>
-        <p className="text-sm text-neutral-600">No active plan yet — nothing to reflect on.</p>
       </main>
     );
   }
@@ -94,119 +90,103 @@ export default async function GoalReflectPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
-      <div>
-        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <Link href={`/goals/${goalId}/today`} className="underline">
-            Today
-          </Link>
-          <Link href={`/goals/${goalId}/week`} className="underline">
-            This week
-          </Link>
-          <Link href={`/goals/${goalId}/history`} className="underline">
-            History
-          </Link>
-        </nav>
-        <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Week {week.week_index + 1} · {week.starts_on} → {week.ends_on}
-        </p>
-      </div>
+    <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+      <StandingAnswer line1={`Week ${week.week_index + 1}, in review.`} line2={`${week.starts_on} → ${week.ends_on}`} />
 
-      <dl className="flex gap-6 border-b border-neutral-200 pb-6 text-sm">
+      <dl className="flex gap-8 border-b border-rule pb-6 text-sm">
         <div>
-          <dt className="text-neutral-500">Planned</dt>
-          <dd className="font-medium tabular-nums">{formatMinutes(plannedMinutes)}</dd>
+          <dt className="text-ink-muted">Planned</dt>
+          <dd className="font-medium tabular-nums text-ink">{formatMinutes(plannedMinutes)}</dd>
         </div>
         <div>
-          <dt className="text-neutral-500">Completed</dt>
-          <dd className="font-medium tabular-nums">{formatMinutes(completedMinutes)}</dd>
+          <dt className="text-ink-muted">Completed</dt>
+          <dd className="font-medium tabular-nums text-ink">{formatMinutes(completedMinutes)}</dd>
         </div>
         <div>
-          <dt className="text-neutral-500">Tasks done</dt>
-          <dd className="font-medium tabular-nums">
+          <dt className="text-ink-muted">Tasks done</dt>
+          <dd className="font-medium tabular-nums text-ink">
             {tasksDone} / {tasks.length}
           </dd>
         </div>
       </dl>
 
       {reflection ? (
-        <div className="flex flex-col gap-4">
-          <div className="rounded-md border border-neutral-200 p-4 text-sm">
-            <h2 className="font-medium">Your reflection</h2>
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2 text-sm">
             {reflection.what_worked && (
-              <p className="mt-2">
-                <span className="text-neutral-500">Worked: </span>
-                {reflection.what_worked}
+              <p>
+                <span className="text-ink-muted">Worked: </span>
+                <span className="text-ink">{reflection.what_worked}</span>
               </p>
             )}
             {reflection.what_didnt && (
-              <p className="mt-2">
-                <span className="text-neutral-500">Didn&apos;t: </span>
-                {reflection.what_didnt}
+              <p>
+                <span className="text-ink-muted">Didn&apos;t: </span>
+                <span className="text-ink">{reflection.what_didnt}</span>
               </p>
             )}
             {reflection.blockers && (
-              <p className="mt-2">
-                <span className="text-neutral-500">Blockers: </span>
-                {reflection.blockers}
+              <p>
+                <span className="text-ink-muted">In the way: </span>
+                <span className="text-ink">{reflection.blockers}</span>
               </p>
             )}
           </div>
           {synthesis && (
-            <div className="rounded-md border border-neutral-200 bg-neutral-50 p-4 text-sm">
-              <h2 className="font-medium">Synthesis</h2>
-              {synthesis.summary && <p className="mt-2">{synthesis.summary}</p>}
+            <div className="flex flex-col gap-2 border-t border-rule pt-4 text-sm">
+              {synthesis.summary && <p className="text-ink">{synthesis.summary}</p>}
               {synthesis.patterns && synthesis.patterns.length > 0 && (
-                <ul className="mt-2 list-disc pl-5 text-neutral-600">
+                <ul className="flex flex-col gap-1 text-ink-muted">
                   {synthesis.patterns.map((p, i) => (
-                    <li key={i}>{p}</li>
+                    <li key={i}>· {p}</li>
                   ))}
                 </ul>
               )}
               {synthesis.recommendation && (
-                <p className="mt-2">
-                  <span className="font-medium text-neutral-700">Recommendation: </span>
+                <p className="text-ink">
+                  <span className="font-medium">Next: </span>
                   {synthesis.recommendation}
                 </p>
               )}
             </div>
           )}
           <form action={requestReplanAction}>
-            <button type="submit" className={buttonClass("secondary", "small")}>
-              Request a replan
+            <button type="submit" className={`self-start ${buttonClass("secondary", "small")}`}>
+              Get a fresh read on the plan
             </button>
           </form>
         </div>
       ) : (
-        <form action={submitAction} className="flex flex-col gap-4 text-sm">
-          <label className="flex flex-col gap-1">
+        <form action={submitAction} className="flex flex-col gap-5 text-sm">
+          <label className="flex flex-col gap-1.5">
             What worked
-            <textarea name="whatWorked" rows={3} className="rounded-md border border-neutral-300 px-3 py-2" />
+            <textarea name="whatWorked" rows={3} className="rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink" />
           </label>
-          <label className="flex flex-col gap-1">
+          <label className="flex flex-col gap-1.5">
             What didn&apos;t
-            <textarea name="whatDidnt" rows={3} className="rounded-md border border-neutral-300 px-3 py-2" />
+            <textarea name="whatDidnt" rows={3} className="rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink" />
           </label>
-          <label className="flex flex-col gap-1">
-            Blockers
-            <textarea name="blockers" rows={3} className="rounded-md border border-neutral-300 px-3 py-2" />
+          <label className="flex flex-col gap-1.5">
+            What was in the way
+            <textarea name="blockers" rows={3} className="rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink" />
           </label>
-          <button type="submit" className={`self-start ${buttonClass("primary", "small")}`}>
-            Submit reflection
-          </button>
+          <div className="flex gap-3">
+            <button type="submit" className={`self-start ${buttonClass("primary", "small")}`}>
+              Submit
+            </button>
+          </div>
         </form>
       )}
 
-      <nav aria-label="Week navigation" className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
+      <nav aria-label="Week navigation" className="flex justify-between border-t border-rule pt-4 text-sm">
         {weekIndex > 0 ? (
-          <Link href={`/goals/${goalId}/reflect?week=${weekIndex - 1}`} className="underline">
+          <Link href={`/goals/${goalId}/reflect?week=${weekIndex - 1}`} className="text-ink underline decoration-rule underline-offset-2 hover:text-accent">
             ← Previous week
           </Link>
         ) : (
           <span />
         )}
-        <Link href={`/goals/${goalId}/reflect?week=${weekIndex + 1}`} className="underline">
+        <Link href={`/goals/${goalId}/reflect?week=${weekIndex + 1}`} className="text-ink underline decoration-rule underline-offset-2 hover:text-accent">
           Next week →
         </Link>
       </nav>

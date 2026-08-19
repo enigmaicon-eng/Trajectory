@@ -2,12 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
-
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${hours}h`;
-}
+import { StandingAnswer } from "@/components/ui/StandingAnswer";
+import { StatusMark } from "@/components/ui/HealthMark";
+import { formatMinutes, weekdayLabel } from "@/lib/format";
+import { daysInRange, isoWeekday, todayISO } from "@/lib/domain/dates";
+import { TRIGGER_NOTICE, TRIGGER_LEAD } from "@/lib/replan-copy";
 
 export default async function GoalWeekPage({
   params,
@@ -25,11 +24,7 @@ export default async function GoalWeekPage({
   } = await db.auth.getUser();
   if (!user) redirect(`/auth/sign-in?next=${encodeURIComponent(`/goals/${goalId}/week`)}`);
 
-  const { data: goal } = await db
-    .from("goals")
-    .select("id, title, outcome_statement")
-    .eq("id", goalId)
-    .maybeSingle();
+  const { data: goal } = await db.from("goals").select("id, title, horizon_weeks").eq("id", goalId).maybeSingle();
   if (!goal) notFound();
 
   const { data: plan } = await db
@@ -41,14 +36,10 @@ export default async function GoalWeekPage({
 
   if (!plan) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-6 px-6 py-16">
-        <Link href={`/goals/${goalId}/map`} className="text-sm text-neutral-500 underline">
-          ← Goal map
-        </Link>
-        <h1 className="text-xl font-medium">{goal.title}</h1>
-        <p className="text-sm text-neutral-600">
-          This goal doesn&apos;t have an active plan yet — generation may have been interrupted
-          (often a temporary generation limit).
+      <main id="main" className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
+        <StandingAnswer line1="Your plan is being built." />
+        <p className="text-sm text-ink-muted">
+          Generation may have been interrupted — this is usually a temporary limit, and nothing was lost.
         </p>
         <GenerateNowButton goalId={goalId} />
       </main>
@@ -64,7 +55,6 @@ export default async function GoalWeekPage({
     .eq("plan_id", plan.id)
     .eq("week_index", weekIndex)
     .maybeSingle();
-
   if (!week) notFound();
 
   const { data: outcomes } = await db
@@ -80,134 +70,183 @@ export default async function GoalWeekPage({
     .order("scheduled_for", { ascending: true })
     .order("sequence", { ascending: true });
 
-  const tasksByOutcome = new Map<string, typeof tasks>();
-  const unlinkedTasks: NonNullable<typeof tasks> = [];
-  for (const t of tasks ?? []) {
-    if (!t.weekly_outcome_id) {
-      unlinkedTasks.push(t);
-      continue;
-    }
+  const allTasks = tasks ?? [];
+  const outcomeList = outcomes ?? [];
+  const tasksByOutcome = new Map<string, typeof allTasks>();
+  for (const t of allTasks) {
+    if (!t.weekly_outcome_id) continue;
     const list = tasksByOutcome.get(t.weekly_outcome_id) ?? [];
     list.push(t);
     tasksByOutcome.set(t.weekly_outcome_id, list);
   }
 
-  const plannedMinutes = (tasks ?? []).reduce((sum, t) => sum + t.effort_minutes, 0);
+  const plannedMinutes = allTasks.reduce((sum, t) => sum + t.effort_minutes, 0);
   const overBudget = plannedMinutes > week.capacity_minutes;
+  const barPct = week.capacity_minutes > 0 ? Math.min(100, Math.round((plannedMinutes / week.capacity_minutes) * 100)) : 0;
+
+  const today = todayISO();
+  const days = daysInRange(week.starts_on, week.ends_on);
+  const tasksByDay = new Map<string, typeof allTasks>();
+  for (const t of allTasks) {
+    if (!t.scheduled_for) continue;
+    const list = tasksByDay.get(t.scheduled_for) ?? [];
+    list.push(t);
+    tasksByDay.set(t.scheduled_for, list);
+  }
+
+  const notDone = allTasks.filter((t) => t.status === "deferred");
+
+  const { data: pendingReplan } = await db
+    .from("replan_events")
+    .select("id, trigger")
+    .eq("goal_id", goalId)
+    .is("accepted", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const outcomesDone = outcomeList.filter((o) => o.status === "complete").length;
+  const standingLine1 =
+    outcomeList.length === 0
+      ? `Week ${week.week_index + 1} doesn't have outcomes yet.`
+      : `This week: ${outcomeList[0].statement.charAt(0).toLowerCase() + outcomeList[0].statement.slice(1)}.`;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-16">
-      <div>
-        <nav aria-label="Goal" className="flex flex-wrap gap-4 text-sm text-neutral-500">
-          <Link href={`/goals/${goalId}/today`} className="underline">
-            Today
-          </Link>
-          <Link href={`/goals/${goalId}/map`} className="underline">
-            Goal map
-          </Link>
-          <Link href={`/goals/${goalId}/reflect`} className="underline">
-            Reflect
-          </Link>
-          <Link href={`/goals/${goalId}/history`} className="underline">
-            History
-          </Link>
-        </nav>
-        <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
-        <p className="mt-1 text-neutral-600">{goal.outcome_statement}</p>
-      </div>
+    <main id="main" className="mx-auto flex min-h-screen max-w-3xl flex-col gap-10 px-6 py-16">
+      <StandingAnswer line1={standingLine1} />
 
-      <div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-neutral-200 pb-6">
-        <div>
-          <h2 className="text-lg font-medium">
-            Week {week.week_index + 1}
-            {week.theme && <span className="ml-2 text-neutral-500">— {week.theme}</span>}
-          </h2>
-          <p className="text-sm text-neutral-500">
-            {week.starts_on} → {week.ends_on}
-          </p>
-        </div>
-        <dl className="flex gap-6 text-sm">
-          <div>
-            <dt className="text-neutral-500">Capacity budget</dt>
-            <dd className="font-medium tabular-nums">{formatMinutes(week.capacity_minutes)}</dd>
-          </div>
-          <div>
-            <dt className="text-neutral-500">Planned</dt>
-            <dd className={`font-medium tabular-nums ${overBudget ? "text-red-600" : ""}`}>
-              {formatMinutes(plannedMinutes)}
-            </dd>
-          </div>
-        </dl>
-      </div>
-
-      {!outcomes || outcomes.length === 0 ? (
-        <p className="text-sm text-neutral-600">
-          Week {week.week_index + 1} doesn&apos;t have generated outcomes yet — it will fill in as you get
-          closer to it.
+      <div className="flex flex-col gap-2">
+        <p className="text-sm text-ink-muted">
+          Week {week.week_index + 1}
+          {goal.horizon_weeks ? ` of ${goal.horizon_weeks}` : ""} · {week.starts_on} → {week.ends_on} ·{" "}
+          <span className="tabular-nums">{formatMinutes(plannedMinutes)}</span> planned of{" "}
+          <span className="tabular-nums">{formatMinutes(week.capacity_minutes)}</span>
+          {overBudget && <span className="text-health-risk"> — over budget</span>}
         </p>
-      ) : (
-        <ol className="flex flex-col gap-6">
-          {outcomes.map((o) => {
-            const outcomeTasks = (tasksByOutcome.get(o.id) ?? []).sort((a, b) =>
-              a.scheduled_for && b.scheduled_for ? a.scheduled_for.localeCompare(b.scheduled_for) : 0,
-            );
-            return (
-              <li key={o.id} className="rounded-md border border-neutral-200 p-4">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-medium">{o.statement}</h3>
-                  <span className="text-xs uppercase tracking-wide text-neutral-500">
-                    Priority {o.priority}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-neutral-500">
-                  <span className="font-medium text-neutral-700">Success: </span>
-                  {o.success_criteria}
-                </p>
+        <div className="h-0.5 w-full max-w-xs rounded-full bg-rule" role="img" aria-label={`${barPct}% of capacity planned`}>
+          <div
+            className={`h-0.5 rounded-full ${overBudget ? "bg-health-risk" : "bg-accent"}`}
+            style={{ width: `${barPct}%` }}
+          />
+        </div>
+      </div>
 
-                {outcomeTasks.length > 0 && (
-                  <ul className="mt-4 flex flex-col gap-2 border-t border-neutral-100 pt-4 text-sm">
-                    {outcomeTasks.map((t) => (
-                      <li key={t.id} className="rounded-md bg-neutral-50 p-3">
-                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                          <span className="font-medium">{t.title}</span>
-                          <span className="flex items-center gap-2 text-xs text-neutral-500">
-                            <span>{t.scheduled_for ?? "unscheduled"}</span>
-                            <span className="tabular-nums">{formatMinutes(t.effort_minutes)}</span>
-                          </span>
-                        </div>
-                        {t.why && <p className="mt-1 text-xs text-neutral-500">{t.why}</p>}
-                      </li>
-                    ))}
-                  </ul>
+      <section aria-labelledby="outcomes-heading" className="flex flex-col gap-6">
+        <h2 id="outcomes-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+          Outcomes
+        </h2>
+        {outcomeList.length === 0 ? (
+          <p className="text-sm text-ink-muted">
+            This week doesn&apos;t have outcomes yet — that&apos;s a fault on our side.
+          </p>
+        ) : (
+          <ol className="flex flex-col gap-6">
+            {outcomeList.map((o) => {
+              const outcomeTasks = (tasksByOutcome.get(o.id) ?? []).sort((a, b) =>
+                a.scheduled_for && b.scheduled_for ? a.scheduled_for.localeCompare(b.scheduled_for) : 0,
+              );
+              return (
+                <li key={o.id} className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <StatusMark status={o.status} />
+                      <h3 className="text-base font-medium text-ink">{o.statement}</h3>
+                    </div>
+                  </div>
+                  <p className="pl-[1.9rem] text-sm text-ink-muted">
+                    <span className="font-medium text-ink">Done when: </span>
+                    {o.success_criteria}
+                  </p>
+                  {outcomeTasks.length > 0 && (
+                    <ul className="mt-1 flex flex-col gap-1 pl-[1.9rem]">
+                      {outcomeTasks.map((t) => (
+                        <li key={t.id} className="flex items-baseline justify-between gap-2 text-sm text-ink-muted">
+                          <span className={t.status === "done" ? "text-ink-faint line-through" : ""}>{t.title}</span>
+                          <span className="tabular-nums shrink-0">{formatMinutes(t.effort_minutes)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {outcomeList.length > 0 && (
+          <p className="text-sm text-ink-muted">
+            {outcomesDone} of {outcomeList.length} outcome{outcomeList.length === 1 ? "" : "s"} met
+          </p>
+        )}
+      </section>
+
+      <section aria-labelledby="days-heading" className="flex flex-col gap-2">
+        <h2 id="days-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+          Days
+        </h2>
+        <ul className="flex flex-col">
+          {days.map((d) => {
+            const dayTasks = (tasksByDay.get(d) ?? []).filter((t) => t.status !== "deferred");
+            const isToday = d === today;
+            const minutes = dayTasks.reduce((s, t) => s + t.effort_minutes, 0);
+            return (
+              <li key={d} className={`flex min-h-11 flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rule py-2 last:border-b-0`}>
+                <span className={`w-10 shrink-0 text-sm ${isToday ? "font-medium text-accent" : "text-ink-muted"}`}>
+                  {weekdayLabel(isoWeekday(d))}
+                </span>
+                {dayTasks.length === 0 ? (
+                  <span className="text-sm text-ink-faint">— no work planned</span>
+                ) : (
+                  <span className="flex flex-1 flex-wrap items-baseline gap-x-2 text-sm">
+                    <StatusMark status={dayTasks.every((t) => t.status === "done") ? "complete" : "not_started"} />
+                    <span className="tabular-nums text-ink-muted">{formatMinutes(minutes)}</span>
+                    <span className="text-ink">{dayTasks.map((t) => t.title).join(" · ")}</span>
+                  </span>
                 )}
               </li>
             );
           })}
-        </ol>
-      )}
+        </ul>
+      </section>
 
-      {unlinkedTasks.length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-neutral-700">Other tasks this week</h3>
-          <ul className="mt-2 flex flex-col gap-2 text-sm">
-            {unlinkedTasks.map((t) => (
-              <li key={t.id} className="rounded-md bg-neutral-50 p-3">
-                {t.title} — <span className="tabular-nums">{formatMinutes(t.effort_minutes)}</span>
+      {notDone.length > 0 && (
+        <section aria-labelledby="not-done-heading" className="flex flex-col gap-2 border-t border-rule pt-6">
+          <h2 id="not-done-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
+            Not done this week
+          </h2>
+          <ul className="flex flex-col gap-1">
+            {notDone.map((t) => (
+              <li key={t.id} className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="text-ink-muted">
+                  {t.scheduled_for ? weekdayLabel(isoWeekday(t.scheduled_for)) : ""} {t.title}
+                </span>
+                <span className="tabular-nums text-ink-faint">{formatMinutes(t.effort_minutes)}</span>
               </li>
             ))}
           </ul>
-        </div>
+        </section>
       )}
 
-      <nav aria-label="Week navigation" className="flex justify-between border-t border-neutral-200 pt-4 text-sm">
+      {pendingReplan && (
+        <Link
+          href={`/goals/${goalId}/history`}
+          className="flex items-baseline justify-between gap-4 border-t border-rule pt-4 text-sm text-ink hover:text-accent"
+        >
+          <span>
+            <span className="font-medium">{TRIGGER_LEAD[pendingReplan.trigger]}</span> {TRIGGER_NOTICE[pendingReplan.trigger]}
+          </span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      )}
+
+      <nav aria-label="Week navigation" className="flex justify-between border-t border-rule pt-4 text-sm">
         {weekIndex > 0 ? (
-          <Link href={`/goals/${goalId}/week?week=${weekIndex - 1}`} className="underline">
+          <Link href={`/goals/${goalId}/week?week=${weekIndex - 1}`} className="text-ink underline decoration-rule underline-offset-2 hover:text-accent">
             ← Previous week
           </Link>
         ) : (
           <span />
         )}
-        <Link href={`/goals/${goalId}/week?week=${weekIndex + 1}`} className="underline">
+        <Link href={`/goals/${goalId}/week?week=${weekIndex + 1}`} className="text-ink underline decoration-rule underline-offset-2 hover:text-accent">
           Next week →
         </Link>
       </nav>

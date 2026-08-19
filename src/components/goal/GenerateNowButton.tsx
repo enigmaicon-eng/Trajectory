@@ -39,7 +39,7 @@ export function GenerateNowButton({ goalId }: { goalId: string }) {
   if (state === "quota") {
     return (
       <div className="flex flex-col gap-2 text-sm">
-        <p className="text-neutral-800">
+        <p className="text-ink">
           Still over the free plan&apos;s limit — resets {resetsAt ? formatResetsAt(resetsAt) : "soon"}.
         </p>
         <Link href="/settings/ai" className={`self-start ${buttonClass("primary", "small")}`}>
@@ -59,7 +59,7 @@ export function GenerateNowButton({ goalId }: { goalId: string }) {
         {state === "busy" ? "Generating..." : "Generate now"}
       </button>
       {state === "error" && (
-        <p className="text-sm text-red-600">That didn&apos;t work. Try again.</p>
+        <p className="text-sm text-danger-ink">That didn&apos;t work. Try again.</p>
       )}
     </div>
   );

@@ -27,36 +27,39 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
-      <h1 className="text-xl font-medium">Sign in</h1>
+    <main id="main" className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-6">
+      <h1 className="text-[28px] font-normal leading-tight tracking-tight text-ink">Sign in</h1>
 
       {status === "sent" ? (
-        <p className="text-sm text-neutral-600">
-          Check {email} for a sign-in link.
-        </p>
+        <p className="text-sm text-ink-muted">Check {email} for a sign-in link.</p>
       ) : (
         <form onSubmit={signInWithEmail} className="flex flex-col gap-3">
-          <input
-            type="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-md border border-neutral-300 px-3 py-2 text-sm"
-          />
+          <label className="flex flex-col gap-1.5 text-sm text-ink-muted">
+            Email
+            <input
+              type="email"
+              required
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="rounded-md border border-rule bg-paper px-3 py-2 text-base text-ink"
+            />
+          </label>
           <button type="submit" className={buttonClass("primary")}>
             Send sign-in link
           </button>
           {status === "error" && (
-            <p className="text-sm text-red-600">Something went wrong. Try again.</p>
+            <p role="alert" className="text-sm text-danger-ink">
+              That didn&apos;t send. Try again.
+            </p>
           )}
         </form>
       )}
 
-      <div className="flex items-center gap-3 text-xs text-neutral-600">
-        <div className="h-px flex-1 bg-neutral-200" />
+      <div className="flex items-center gap-3 text-xs text-ink-muted">
+        <div className="h-px flex-1 bg-rule" />
         or
-        <div className="h-px flex-1 bg-neutral-200" />
+        <div className="h-px flex-1 bg-rule" />
       </div>
 
       <button onClick={signInWithGoogle} className={buttonClass("secondary")}>

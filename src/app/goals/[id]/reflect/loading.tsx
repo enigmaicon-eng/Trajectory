@@ -12,7 +12,7 @@ export default function Loading() {
         <SkeletonBlock className="mt-3 h-6 w-1/2" />
         <SkeletonBlock className="mt-2 h-4 w-1/3" />
       </div>
-      <div className="flex gap-6 border-b border-neutral-200 pb-6">
+      <div className="flex gap-6 border-b border-rule pb-6">
         {[0, 1, 2].map((i) => (
           <SkeletonBlock key={i} className="h-8 w-16" />
         ))}

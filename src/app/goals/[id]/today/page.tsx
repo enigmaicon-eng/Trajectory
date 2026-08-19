@@ -1,29 +1,19 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/db/server";
 import { packDayTiers, type DayTaskLike } from "@/lib/domain/day-tiers";
-import { todayISO } from "@/lib/domain/dates";
-import { completeTask, skipTask, submitCheckIn } from "@/server/actions/execution";
+import { addDays, todayISO } from "@/lib/domain/dates";
+import { TRIGGER_NOTICE, TRIGGER_LEAD } from "@/lib/replan-copy";
+import { pickDefaultTier, TIER_ORDER, type TierKey } from "@/lib/tier-select";
+import { StandingAnswer } from "@/components/ui/StandingAnswer";
+import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
+import { TodayBody, type TodayTaskVM } from "@/components/goal/TodayBody";
 import { buttonClass } from "@/components/ui/button-styles";
+import Link from "next/link";
 
-function formatMinutes(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${hours}h`;
-}
+const TIER_MINUTES_ORDER = TIER_ORDER;
 
-const TIER_LABEL = { minimum: "Minimum-viable", normal: "Normal", ideal: "Ideal" } as const;
-type Tier = keyof typeof TIER_LABEL;
-
-export default async function GoalTodayPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ tier?: string }>;
-}) {
+export default async function GoalTodayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: goalId } = await params;
-  const { tier: tierParam } = await searchParams;
   const db = await createClient();
 
   const {
@@ -33,10 +23,32 @@ export default async function GoalTodayPage({
 
   const { data: goal } = await db
     .from("goals")
-    .select("id, title, outcome_statement")
+    .select("id, title, outcome_statement, status")
     .eq("id", goalId)
     .maybeSingle();
   if (!goal) notFound();
+
+  const { data: plan } = await db
+    .from("plans")
+    .select("id, horizon_start")
+    .eq("goal_id", goalId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!plan) {
+    return (
+      <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+        <StandingAnswer line1="Your plan is being built." />
+        <p className="text-sm text-ink-muted">
+          Generation may have been interrupted — this is usually a temporary limit, and nothing was lost.
+        </p>
+        <GenerateNowButton goalId={goalId} />
+      </main>
+    );
+  }
+
+  const today = todayISO();
+  const yesterday = addDays(today, -1);
 
   const { data: capacityRow } = await db
     .from("capacity_profiles")
@@ -51,141 +63,176 @@ export default async function GoalTodayPage({
     minimumMinutes: capacityRow?.minimum_minutes ?? 20,
   };
 
-  const today = todayISO();
   const { data: taskRows } = await db
     .from("tasks")
-    .select("id, title, why, effort_minutes, tier, sequence, status, scheduled_for")
+    .select("id, title, why, effort_minutes, tier, sequence, status, scheduled_for, weekly_outcome_id")
     .eq("goal_id", goalId)
     .eq("scheduled_for", today)
     .order("sequence", { ascending: true });
-
   const allTasks = taskRows ?? [];
   const pendingTasks = allTasks.filter((t) => t.status === "pending");
-  const doneCount = allTasks.filter((t) => t.status === "done").length;
+  const doneTasks = allTasks.filter((t) => t.status === "done");
+  const doneCount = doneTasks.length;
 
-  const tierInput: (DayTaskLike & { id: string; title: string; why: string | null; effortMinutes: number })[] =
-    pendingTasks.map((t) => ({
-      id: t.id,
-      title: t.title,
-      why: t.why,
-      effortMinutes: t.effort_minutes,
-      tier: t.tier,
-      sequence: t.sequence,
-    }));
-  const tiers = packDayTiers(tierInput, capacity);
+  const { data: missedRows } = await db
+    .from("tasks")
+    .select("id, title, effort_minutes")
+    .eq("goal_id", goalId)
+    .eq("scheduled_for", yesterday)
+    .eq("status", "pending")
+    .order("sequence", { ascending: true });
+  const missed = missedRows ?? [];
 
-  const selectedTier: Tier = tierParam === "minimum" || tierParam === "ideal" ? tierParam : "normal";
-  const selectedTasks = tiers[selectedTier];
-  const selectedMinutes = selectedTasks.reduce((sum, t) => sum + t.effortMinutes, 0);
+  const { data: forwardCheckin } = await db
+    .from("checkins")
+    .select("minutes_available, energy")
+    .eq("goal_id", goalId)
+    .eq("kind", "daily")
+    .eq("occurred_on", today)
+    .maybeSingle();
 
-  async function submitCheckInAction(formData: FormData) {
-    "use server";
-    const minutesSpentRaw = formData.get("minutesSpent");
-    const energyRaw = formData.get("energy");
-    await submitCheckIn({
-      goalId,
-      kind: "daily",
-      occurredOn: todayISO(),
-      minutesSpent: minutesSpentRaw ? Number(minutesSpentRaw) : undefined,
-      energy: energyRaw ? Number(energyRaw) : undefined,
-    });
+  const { data: pendingReplan } = await db
+    .from("replan_events")
+    .select("id, trigger")
+    .eq("goal_id", goalId)
+    .is("accepted", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { count: allTimeDoneCount } = await db
+    .from("tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("goal_id", goalId)
+    .eq("status", "done");
+  const isFirstRun = (allTimeDoneCount ?? 0) === 0;
+
+  const { data: currentWeekRow } = await db
+    .from("plan_weeks")
+    .select("id, week_index")
+    .eq("plan_id", plan.id)
+    .lte("starts_on", today)
+    .gte("ends_on", today)
+    .maybeSingle();
+
+  let weekContextLine: string | null = null;
+  const { data: goalRow } = await db.from("goals").select("horizon_weeks").eq("id", goalId).maybeSingle();
+  if (currentWeekRow) {
+    const { data: topOutcome } = await db
+      .from("weekly_outcomes")
+      .select("statement")
+      .eq("plan_week_id", currentWeekRow.id)
+      .order("priority", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const total = goalRow?.horizon_weeks;
+    weekContextLine = `Week ${currentWeekRow.week_index + 1}${total ? ` of ${total}` : ""}${
+      topOutcome ? ` · ${topOutcome.statement}` : ""
+    }`;
+  }
+
+  const tierBudget: Record<TierKey, number> = {
+    minimum: capacity.minimumMinutes,
+    normal: capacity.normalMinutes,
+    ideal: capacity.idealMinutes,
+  };
+
+  const toVM = (t: { id: string; title: string; why: string | null; effort_minutes: number }): TodayTaskVM => ({
+    id: t.id,
+    title: t.title,
+    why: t.why,
+    effortMinutes: t.effort_minutes,
+  });
+
+  const tierInput: (DayTaskLike & { id: string })[] = pendingTasks.map((t) => ({
+    id: t.id,
+    tier: t.tier,
+    sequence: t.sequence,
+    effortMinutes: t.effort_minutes,
+  }));
+  const pendingTierSets = packDayTiers(tierInput, capacity);
+  const defaultTier = pickDefaultTier(forwardCheckin?.minutes_available ?? null, tierBudget);
+
+  let standingLine1: string;
+  let standingLine2: string | null = null;
+
+  if (allTasks.length === 0) {
+    standingLine1 = weekContextLine
+      ? `Nothing is scheduled today. ${weekContextLine.split(" · ")[0]} continues tomorrow.`
+      : "Nothing is scheduled today.";
+  } else {
+    const firstOfDefault = pendingTierSets[defaultTier][0];
+
+    if (pendingTasks.length === 0) {
+      standingLine1 = "That's today. Everything planned is done.";
+    } else if (defaultTier === "minimum" && firstOfDefault) {
+      const task = pendingTasks.find((t) => t.id === firstOfDefault.id);
+      standingLine1 = `You have ${capacity.minimumMinutes} minutes today. One thing: ${task?.title ?? "the next task"}.`;
+    } else if (firstOfDefault) {
+      const task = pendingTasks.find((t) => t.id === firstOfDefault.id);
+      standingLine1 = `${task?.title ?? "Your next task"} — ${firstOfDefault.effortMinutes} minutes.`;
+      standingLine2 = task?.why ?? null;
+    } else {
+      standingLine1 = "That's today. Everything in this tier is done.";
+    }
+  }
+
+  const pendingById = new Map(pendingTasks.map((t) => [t.id, t]));
+  const doneVMs = doneTasks.map((t) => ({ ...toVM(t), tierRank: TIER_MINUTES_ORDER.indexOf(t.tier as TierKey) }));
+
+  const tiers: Record<TierKey, TodayTaskVM[]> = { minimum: [], normal: [], ideal: [] };
+  for (const tierKey of TIER_MINUTES_ORDER) {
+    const rank = TIER_MINUTES_ORDER.indexOf(tierKey);
+    const pending = pendingTierSets[tierKey]
+      .map((t) => pendingById.get(t.id))
+      .filter((t): t is NonNullable<typeof t> => Boolean(t))
+      .map(toVM);
+    const done = doneVMs.filter((t) => t.tierRank <= rank).map(({ tierRank: _tierRank, ...rest }) => rest);
+    const bySeq = new Map(allTasks.map((t) => [t.id, t.sequence]));
+    tiers[tierKey] = [...pending, ...done].sort((a, b) => (bySeq.get(a.id) ?? 0) - (bySeq.get(b.id) ?? 0));
+  }
+
+  const doneIds = new Set(doneTasks.map((t) => t.id));
+
+  let replanNotice: { id: string; lead: string; line: string } | null = null;
+  if (pendingReplan) {
+    replanNotice = {
+      id: pendingReplan.id,
+      lead: TRIGGER_LEAD[pendingReplan.trigger],
+      line: TRIGGER_NOTICE[pendingReplan.trigger],
+    };
+  }
+
+  if (goal.status === "paused") {
+    return (
+      <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+        <StandingAnswer line1={`${goal.title} is paused.`} />
+        <Link href={`/goals/${goalId}`} className={buttonClass("primary")}>
+          Go to progress
+        </Link>
+      </main>
+    );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
-      <div>
-        <Link href={`/goals/${goalId}/week`} className="text-sm text-neutral-500 underline">
-          ← This week
-        </Link>
-        <h1 className="mt-2 text-xl font-medium">{goal.title}</h1>
-        <p className="mt-1 text-sm text-neutral-500">{today}</p>
-      </div>
-
-      {allTasks.length === 0 ? (
-        <p className="text-sm text-neutral-600">
-          Nothing scheduled today. Check <Link href={`/goals/${goalId}/week`} className="underline">this week</Link>{" "}
-          for what&apos;s coming up.
-        </p>
-      ) : (
-        <>
-          <div className="flex gap-2 overflow-x-auto border-b border-neutral-200 pb-4">
-            {(Object.keys(TIER_LABEL) as Tier[]).map((t) => (
-              <Link
-                key={t}
-                href={`/goals/${goalId}/today?tier=${t}`}
-                className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 focus-visible:ring-offset-2 ${
-                  t === selectedTier
-                    ? "bg-neutral-900 text-white"
-                    : "border border-neutral-300 text-neutral-700"
-                }`}
-              >
-                {TIER_LABEL[t]}
-                <span className="ml-1.5 tabular-nums opacity-70">({tiers[t].length})</span>
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-baseline justify-between text-sm text-neutral-500">
-            <span>
-              {doneCount} of {allTasks.length} done today
-            </span>
-            <span className="tabular-nums">{formatMinutes(selectedMinutes)} selected</span>
-          </div>
-
-          {selectedTasks.length === 0 ? (
-            <p className="text-sm text-neutral-600">Nothing in this tier — everything&apos;s already done.</p>
-          ) : (
-            <ul className="flex flex-col gap-3">
-              {selectedTasks.map((t) => (
-                <li key={t.id} className="rounded-md border border-neutral-200 p-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="font-medium">{t.title}</span>
-                    <span className="tabular-nums text-xs text-neutral-500">{formatMinutes(t.effortMinutes)}</span>
-                  </div>
-                  {t.why && <p className="mt-1 text-sm text-neutral-600">{t.why}</p>}
-                  <div className="mt-3 flex gap-2">
-                    <form action={completeTask.bind(null, { taskId: t.id })}>
-                      <button type="submit" className={buttonClass("primary", "small")}>
-                        Done
-                      </button>
-                    </form>
-                    <form action={skipTask.bind(null, { taskId: t.id })}>
-                      <button type="submit" className={buttonClass("secondary", "small")}>
-                        Skip
-                      </button>
-                    </form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      <form action={submitCheckInAction} className="flex flex-wrap items-end gap-3 border-t border-neutral-200 pt-6 text-sm">
-        <label className="flex flex-col gap-1">
-          Minutes spent today
-          <input
-            type="number"
-            name="minutesSpent"
-            min={0}
-            className="w-28 rounded-md border border-neutral-300 px-2 py-1"
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          Energy (1-5)
-          <input
-            type="number"
-            name="energy"
-            min={1}
-            max={5}
-            className="w-20 rounded-md border border-neutral-300 px-2 py-1"
-          />
-        </label>
-        <button type="submit" className={buttonClass("secondary", "small")}>
-          Check in
-        </button>
-      </form>
+    <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-6 py-16">
+      <TodayBody
+        goalId={goalId}
+        todayISO={today}
+        standingLine1={standingLine1}
+        standingLine2={standingLine2}
+        tiers={tiers}
+        doneIds={[...doneIds]}
+        tierMinutes={tierBudget}
+        defaultTier={defaultTier}
+        doneCount={doneCount}
+        totalCount={allTasks.length}
+        missed={missed.map((m) => ({ id: m.id, title: m.title, effortMinutes: m.effort_minutes }))}
+        weekContextLine={weekContextLine}
+        replanNotice={replanNotice}
+        hasForwardCheckinToday={!!forwardCheckin}
+        isFirstRun={isFirstRun}
+      />
     </main>
   );
 }
