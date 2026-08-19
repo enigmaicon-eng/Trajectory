@@ -12,6 +12,12 @@ import { applyDecomposeInvariants, effortBudgetMinutes, EFFORT_BUDGET_TOLERANCE 
 import { detectCycleEdge } from "@/lib/domain/graph";
 import { horizonEnd } from "@/lib/domain/dates";
 import type { GraphEdge, GraphNode } from "@/lib/domain/types";
+import { planWeekOutputSchema } from "@/lib/ai/modules/plan_week/output.schema";
+import { applyPlanWeekInvariants, UnrepairablePlanWeekError } from "@/lib/domain/plan-invariants";
+import { planDayOutputSchema } from "@/lib/ai/modules/plan_day/output.schema";
+import { reflectOutputSchema } from "@/lib/ai/modules/reflect/output.schema";
+import { replanOutputSchema } from "@/lib/ai/modules/replan/output.schema";
+import { applyReplanInvariants } from "@/lib/ai/modules/replan/invariants";
 import { fixtures } from "./fixtures";
 
 describe("evaluation harness (§5.8)", () => {
@@ -111,6 +117,102 @@ describe("evaluation harness (§5.8)", () => {
           }
         });
       }
+
+      if (fixture.planWeek) {
+        it("plan_week output satisfies schema and the eligible-project grounding invariant (AC-4)", () => {
+          const { input, recorded } = fixture.planWeek!;
+          const parsed = planWeekOutputSchema.parse(recorded);
+          const eligibleIds = new Set(input.eligibleProjects.map((p) => p.id));
+
+          const repaired = applyPlanWeekInvariants(parsed, eligibleIds);
+
+          expect(repaired.weeklyOutcomes.length).toBeGreaterThan(0);
+          const outcomeIds = new Set(repaired.weeklyOutcomes.map((o) => o.tempId));
+          for (const outcome of repaired.weeklyOutcomes) {
+            expect(eligibleIds.has(outcome.projectNodeId)).toBe(true);
+          }
+          for (const task of repaired.candidateTasks) {
+            expect(outcomeIds.has(task.outcomeTempId)).toBe(true);
+            expect(task.why.trim().length).toBeGreaterThan(0);
+            expect(task.effortMinutes).toBeGreaterThan(0);
+          }
+        });
+      }
+
+      if (fixture.planDay) {
+        it("plan_day output satisfies schema — a one-line, non-empty framing (§5.2)", () => {
+          const { recorded } = fixture.planDay!;
+          const parsed = planDayOutputSchema.parse(recorded);
+          expect(parsed.framing.trim().length).toBeGreaterThan(0);
+          expect(parsed.framing.length).toBeLessThanOrEqual(140);
+        });
+      }
+
+      if (fixture.reflect) {
+        it("reflect output satisfies schema — bounded summary/patterns/recommendation/confidence", () => {
+          const { recorded } = fixture.reflect!;
+          const parsed = reflectOutputSchema.parse(recorded);
+          expect(parsed.summary.length).toBeGreaterThan(0);
+          expect(parsed.patterns.length).toBeLessThanOrEqual(5);
+          expect(parsed.recommendation.length).toBeGreaterThan(0);
+          expect(parsed.confidence).toBeGreaterThanOrEqual(0);
+          expect(parsed.confidence).toBeLessThanOrEqual(1);
+        });
+      }
+
+      if (fixture.replan) {
+        it("replan output satisfies schema and drops ops referencing unknown node ids", () => {
+          const { input, recorded } = fixture.replan!;
+          const parsed = replanOutputSchema.parse(recorded);
+          const validIds = new Set(input.milestones.map((m) => m.id));
+
+          const repaired = applyReplanInvariants(parsed, validIds);
+
+          expect(repaired.ops.length).toBeGreaterThan(0);
+          for (const op of repaired.ops) {
+            const referenced = [op.nodeId, op.fromNodeId, op.toNodeId].filter(
+              (id): id is string => id !== null,
+            );
+            for (const id of referenced) {
+              expect(validIds.has(id)).toBe(true);
+            }
+          }
+        });
+      }
     });
   }
+
+  it("exercises plan_week, plan_day, reflect, and replan at least once each", () => {
+    expect(fixtures.some((f) => f.planWeek)).toBe(true);
+    expect(fixtures.some((f) => f.planDay)).toBe(true);
+    expect(fixtures.some((f) => f.reflect)).toBe(true);
+    expect(fixtures.some((f) => f.replan)).toBe(true);
+  });
+
+  it("plan_week drops a weekly outcome that references a project outside the eligible set", () => {
+    const base = fixtures.find((f) => f.planWeek)!.planWeek!;
+    const parsed = planWeekOutputSchema.parse(base.recorded);
+    const withDangling = {
+      weeklyOutcomes: [
+        ...parsed.weeklyOutcomes,
+        { tempId: "wo-ghost", projectNodeId: "p-unknown", statement: "Ghost outcome", successCriteria: "n/a", priority: 2 },
+      ],
+      candidateTasks: parsed.candidateTasks,
+    };
+    const eligibleIds = new Set(base.input.eligibleProjects.map((p) => p.id));
+    const repaired = applyPlanWeekInvariants(withDangling, eligibleIds);
+    expect(repaired.weeklyOutcomes.some((o) => o.tempId === "wo-ghost")).toBe(false);
+  });
+
+  it("plan_week throws when every weekly outcome references an ineligible project (AC-4, no amount of trimming can fix it)", () => {
+    expect(() =>
+      applyPlanWeekInvariants(
+        {
+          weeklyOutcomes: [{ tempId: "wo1", projectNodeId: "p-unknown", statement: "s", successCriteria: "c", priority: 1 }],
+          candidateTasks: [],
+        },
+        new Set(["p-real"]),
+      ),
+    ).toThrow(UnrepairablePlanWeekError);
+  });
 });

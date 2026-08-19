@@ -10,6 +10,14 @@ import type { AssessInput } from "@/lib/ai/modules/assess/input.schema";
 import type { AssessOutput } from "@/lib/ai/modules/assess/output.schema";
 import type { DecomposeInput } from "@/lib/ai/modules/decompose/input.schema";
 import type { DecomposeOutput } from "@/lib/ai/modules/decompose/output.schema";
+import type { PlanWeekInput } from "@/lib/ai/modules/plan_week/input.schema";
+import type { PlanWeekOutput } from "@/lib/ai/modules/plan_week/output.schema";
+import type { PlanDayInput } from "@/lib/ai/modules/plan_day/input.schema";
+import type { PlanDayOutput } from "@/lib/ai/modules/plan_day/output.schema";
+import type { ReflectInput } from "@/lib/ai/modules/reflect/input.schema";
+import type { ReflectOutput } from "@/lib/ai/modules/reflect/output.schema";
+import type { ReplanInput } from "@/lib/ai/modules/replan/input.schema";
+import type { ReplanOutput } from "@/lib/ai/modules/replan/output.schema";
 import { addWeeks, horizonEnd } from "@/lib/domain/dates";
 
 const CAPACITY = { idealMinutes: 90, normalMinutes: 60, minimumMinutes: 20, daysPerWeek: 5 } as const;
@@ -27,6 +35,10 @@ export interface GoalFixture {
   clarify: { input: ClarifyInput; recorded: ClarifyOutput };
   assess?: { input: AssessInput; recorded: AssessOutput };
   decompose?: { input: DecomposeInput; startDate: string; recorded: DecomposeOutput };
+  planWeek?: { input: PlanWeekInput; recorded: PlanWeekOutput };
+  planDay?: { input: PlanDayInput; recorded: PlanDayOutput };
+  reflect?: { input: ReflectInput; recorded: ReflectOutput };
+  replan?: { input: ReplanInput; recorded: ReplanOutput };
 }
 
 export const fixtures: GoalFixture[] = [
@@ -104,6 +116,64 @@ export const fixtures: GoalFixture[] = [
         ],
       },
     },
+    planWeek: {
+      input: {
+        outcomeStatement: "Land a Product Manager role at a top-tier tech company",
+        domain: "career",
+        weekIndex: 0,
+        weeksRemaining: 52,
+        eligibleProjects: [
+          { id: "p1", title: "Ship case study #1", verification: "Published write-up with metrics", estimatedMinutes: 3000 },
+          { id: "p3", title: "Run 15 informational interviews", verification: "15 logged conversations with notes", estimatedMinutes: 2400 },
+        ],
+        capacity: { idealMinutes: 90, normalMinutes: 60, minimumMinutes: 20, availableDayCount: 5 },
+        recentExecution: null,
+      },
+      recorded: {
+        weeklyOutcomes: [
+          {
+            tempId: "wo1",
+            projectNodeId: "p1",
+            statement: "Ship the first draft of case study #1",
+            successCriteria: "Draft with problem framing and first metrics section written",
+            priority: 1,
+          },
+        ],
+        candidateTasks: [
+          { tempId: "t1", outcomeTempId: "wo1", title: "Write the problem framing section", why: "Case study needs a clear problem statement before metrics can land", effortMinutes: 90, tier: "ideal" },
+          { tempId: "t2", outcomeTempId: "wo1", title: "Draft the metrics section outline", why: "Keeps the write-up moving even on a lighter day", effortMinutes: 45, tier: "normal" },
+          { tempId: "t3", outcomeTempId: "wo1", title: "Jot 3 bullet points on the problem", why: "Smallest concrete unit of progress if time is very tight", effortMinutes: 20, tier: "minimum" },
+        ],
+      },
+    },
+    planDay: {
+      input: {
+        tier: "ideal",
+        taskTitles: ["Write the problem framing section", "Draft the metrics section outline"],
+        totalMinutes: 135,
+      },
+      recorded: {
+        framing: "Today is drafting the case study's problem framing and outlining its metrics.",
+      },
+    },
+    reflect: {
+      input: {
+        outcomeStatement: "Land a Product Manager role at a top-tier tech company",
+        domain: "career",
+        weekExecution: { plannedMinutes: 450, completedMinutes: 300, tasksDone: 3, tasksTotal: 5 },
+        userReflection: {
+          whatWorked: "Morning writing sessions on the case study",
+          whatDidnt: "Evening networking outreach kept getting skipped",
+          blockers: "Work ran late most evenings this week",
+        },
+      },
+      recorded: {
+        summary: "Completed 3 of 5 planned tasks (67% of planned minutes), with case-study writing landing consistently and evening outreach the recurring miss.",
+        patterns: ["Evening tasks are consistently skipped", "Morning writing sessions have a near-100% completion rate"],
+        recommendation: "Move next week's outreach tasks to mornings instead of evenings.",
+        confidence: 0.7,
+      },
+    },
   },
 
   // 2 — career, deliberately contains a dependency cycle (AC-3.8 repair path).
@@ -152,6 +222,61 @@ export const fixtures: GoalFixture[] = [
           { fromTempId: "p3", toTempId: "p4", type: "blocks", rationale: "Portfolio must exist before interview prep" },
           { fromTempId: "p4", toTempId: "p2", type: "blocks", rationale: "Model error — not a real constraint" },
         ],
+      },
+    },
+    // Recorded output deliberately includes one op referencing a milestone id
+    // that isn't in the input's `milestones` list — exercises the same
+    // unknown-node-id drop path as decompose's dangling-project fixture.
+    replan: {
+      input: {
+        outcomeStatement: "Land a junior software engineering role",
+        domain: "career",
+        trigger: "low_execution",
+        triggerDetail: "Execution has stayed below half of planned effort for two consecutive weeks.",
+        milestones: [
+          { id: "m1", title: "Learn core fundamentals", targetDate: at(START, 13), risk: "at_risk", onCriticalPath: true },
+          { id: "m2", title: "Build a portfolio", targetDate: at(START, 26), risk: "unknown", onCriticalPath: true },
+          { id: "m3", title: "Interview prep", targetDate: horizonEnd(START, 40), risk: "unknown", onCriticalPath: true },
+        ],
+        capacity: CAPACITY,
+        signals: { momentum: 22.5, executionRate: 0.38, planConfidence: 0.41, riskLevel: "at_risk" },
+      },
+      recorded: {
+        diagnosis: "Execution has stayed under half of planned effort for two straight weeks, concentrated in the fundamentals milestone; at the current pace, the portfolio and interview-prep milestones won't land by their target dates.",
+        confidence: 0.62,
+        ops: [
+          {
+            op: "shift_milestone",
+            reason: "Fundamentals is behind pace; pushing the target date back gives room to finish without compounding pressure downstream.",
+            nodeId: "m1",
+            newTargetDate: at(START, 17),
+            newTitle: null,
+            newVerification: null,
+            fromNodeId: null,
+            toNodeId: null,
+            idealMinutes: null,
+            normalMinutes: null,
+            minimumMinutes: null,
+            daysPerWeek: null,
+            newOutcomeStatement: null,
+          },
+          {
+            op: "shift_milestone",
+            reason: "Model error — references a milestone id that doesn't exist in this goal.",
+            nodeId: "m-unknown",
+            newTargetDate: at(START, 30),
+            newTitle: null,
+            newVerification: null,
+            fromNodeId: null,
+            toNodeId: null,
+            idealMinutes: null,
+            normalMinutes: null,
+            minimumMinutes: null,
+            daysPerWeek: null,
+            newOutcomeStatement: null,
+          },
+        ],
+        tradeoffs: ["Portfolio and interview-prep milestones both shift later by roughly the same amount"],
       },
     },
   },
