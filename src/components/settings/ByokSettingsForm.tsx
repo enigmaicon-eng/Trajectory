@@ -30,7 +30,7 @@ export function ByokSettingsForm({ initialStatus }: { initialStatus: ByokStatus[
       setDraft("");
       setEditing(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Try again.");
+      setError(err instanceof Error ? err.message : "That didn't save. Try again.");
     } finally {
       setBusy(false);
     }
