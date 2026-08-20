@@ -4,6 +4,7 @@ import type { Database } from "@/lib/db/types.generated";
 import { criticalPath, CycleError } from "@/lib/domain/graph";
 import type { GraphEdge, GraphNode } from "@/lib/domain/types";
 import { addDays, daysBetween, daysInRange, todayISO, weekBoundary, type ISODate } from "@/lib/domain/dates";
+import { formatMinutes, formatPercent } from "@/lib/format";
 import {
   computeDataSufficiency,
   computeEffortVariance,
@@ -143,8 +144,17 @@ export async function computeAndPersistGoalSignals(db: DB, goalId: string): Prom
     };
   });
 
-  const momentum = computeMomentum(dailyExecution.slice(-21).map((d) => d.active));
-  const trailing14 = dailyExecution.slice(-14);
+  // A goal a few days old still fills a fixed-length trailing window with
+  // padding for days before it existed — without clamping to how long the
+  // goal has actually been active, a 2-day-old goal would silently satisfy
+  // computeMomentum's "7 days of data" floor with 19 padded "inactive" days
+  // and report a confident, misleadingly low momentum instead of "unknown."
+  const daysSinceStart = daysBetween(goal.started_on ?? today, today) + 1;
+  const momentumWindow = dailyExecution.slice(-Math.min(21, daysSinceStart));
+  const executionWindow = dailyExecution.slice(-Math.min(14, daysSinceStart));
+
+  const momentum = computeMomentum(momentumWindow.map((d) => d.active));
+  const trailing14 = executionWindow;
   const executionRate = computeExecutionRate(trailing14);
   const effortVariance = computeEffortVariance(trailing14);
   const dataSufficiency = computeDataSufficiency(
@@ -198,23 +208,45 @@ export async function computeAndPersistGoalSignals(db: DB, goalId: string): Prom
         daysSinceLastActivity,
       },
       explanation: {
+        // §13.5: this panel renders as database content, not narration — every
+        // string here is baked once, at computation time, from the concrete
+        // numbers behind it. No raw formula notation (AC-9.36's spirit: this
+        // is user-facing copy) — "meaning" is the fixed, plain-language
+        // definition; "basis" is this goal's actual numbers.
         momentum:
           momentum.status === "known"
-            ? { value: momentum.value, basis: "EWMA(0.3) of daily activity, 21-day window" }
+            ? {
+                value: momentum.value,
+                meaning: "How many of the last 21 days had any activity, weighted so recent days count more.",
+                basis: `${momentumWindow.filter((d) => d.active).length} of the last ${momentumWindow.length} day(s) were active`,
+              }
             : { caveat: momentum.reason },
         executionRate:
           executionRate.status === "known"
-            ? { value: executionRate.value, basis: "completed/planned minutes, 14-day window" }
+            ? {
+                value: executionRate.value,
+                meaning: "Completed effort divided by what was planned, over the trailing window.",
+                basis: `${formatMinutes(trailing14.reduce((s, d) => s + d.completedMinutes, 0))} completed of ${formatMinutes(trailing14.reduce((s, d) => s + d.plannedMinutes, 0))} planned, last ${trailing14.length} day(s)`,
+              }
             : { caveat: executionRate.reason },
         planConfidence: {
           value: planConfidence.value,
-          basis: "0.35*feasibility + 0.30*execution + 0.15*(1-variance) + 0.20*data_sufficiency",
-          caveat: planConfidence.lowConfidenceLimitedData ? "low confidence: limited data" : null,
+          meaning: "A blend of how realistic the plan was judged, recent execution, day-to-day consistency, and how much history exists yet.",
+          basis: `feasibility judged at ${formatPercent(assessment?.confidence ?? 0.5)}, execution at ${executionRate.status === "known" ? formatPercent(executionRate.value) : "unknown"}, ${dailyExecution.filter((d) => d.plannedMinutes > 0 || d.active).length} day(s) of history`,
+          caveat: planConfidence.lowConfidenceLimitedData ? "Limited history so far — this will sharpen with more days of execution." : null,
         },
-        riskLevel: { value: goalRiskLevel, basis: "worst risk among critical-path milestones" },
+        riskLevel: {
+          value: goalRiskLevel,
+          meaning: "The worst risk among milestones on the critical path.",
+          basis: "on_track ≤80% of runway needed, at_risk ≤100%, off_track beyond that",
+        },
         projectedCompletion:
           projectedCompletion.status === "known"
-            ? { value: projectedCompletion.value, basis: "critical-path remaining effort / trailing 4-week realized pace" }
+            ? {
+                value: projectedCompletion.value,
+                meaning: "Remaining critical-path effort divided by your realized weekly pace, over the last 4 weeks.",
+                basis: `${formatMinutes(criticalPathRemainingMinutes)} of critical-path work remaining at your recent pace`,
+              }
             : { caveat: projectedCompletion.reason },
       },
     },

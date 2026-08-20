@@ -4,20 +4,17 @@ import { createClient } from "@/lib/db/server";
 import { criticalPath, CycleError } from "@/lib/domain/graph";
 import type { GraphEdge, GraphNode } from "@/lib/domain/types";
 import { computeMilestoneRisk, type MilestoneRiskResult } from "@/lib/domain/signals";
+import { explainGoalHealth, pickWorstMilestone } from "@/lib/domain/goal-health";
 import { todayISO } from "@/lib/domain/dates";
 import type { Database } from "@/lib/db/types.generated";
 import { GenerateNowButton } from "@/components/goal/GenerateNowButton";
 import { buttonClass } from "@/components/ui/button-styles";
 import { StandingAnswer } from "@/components/ui/StandingAnswer";
 import { HealthMark } from "@/components/ui/HealthMark";
+import { GoalHealthExplanation, type SignalField } from "@/components/goal/GoalHealthExplanation";
 import { formatMinutes, formatPercent, formatDateHuman } from "@/lib/format";
 
 type NodeHealth = Database["public"]["Enums"]["node_health"];
-type SignalField = { value: number | string; basis: string; caveat?: string | null } | { caveat: string };
-
-function hasValue(field: SignalField | undefined): field is { value: number | string; basis: string; caveat?: string | null } {
-  return !!field && "value" in field;
-}
 
 export default async function GoalOverviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: goalId } = await params;
@@ -37,12 +34,13 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
 
   const { data: signalsRow } = await db
     .from("goal_signals")
-    .select("captured_on, momentum, execution_rate, plan_confidence, risk_level, projected_completion_date, explanation")
+    .select("captured_on, momentum, execution_rate, plan_confidence, risk_level, projected_completion_date, explanation, inputs")
     .eq("goal_id", goalId)
     .order("captured_on", { ascending: false })
     .limit(1)
     .maybeSingle();
   const explanation = (signalsRow?.explanation ?? null) as Record<string, SignalField> | null;
+  const signalInputs = (signalsRow?.inputs ?? null) as { trailingWeeklyExecutionRates?: number[] } | null;
 
   const { data: nodeRows } = await db
     .from("goal_nodes")
@@ -112,6 +110,31 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
     (n) => n.kind === "project" && criticalNodeIds.has(n.id) && n.status !== "complete",
   );
 
+  const worstMilestone = pickWorstMilestone(
+    milestones.map((m) => ({
+      title: m.title,
+      status: m.status,
+      risk: milestoneRisks.get(m.id)?.risk ?? "unknown",
+      onCriticalPath: criticalNodeIds.has(m.id),
+    })),
+  );
+  const executionRateSignal =
+    signalsRow?.execution_rate != null
+      ? ({ status: "known", value: signalsRow.execution_rate } as const)
+      : ({ status: "unknown", reason: "insufficient data" } as const);
+  const projectedCompletionSignal =
+    signalsRow?.projected_completion_date != null
+      ? ({ status: "known", value: signalsRow.projected_completion_date } as const)
+      : ({ status: "unknown", reason: "insufficient data" } as const);
+  const healthExplanation = explainGoalHealth({
+    dataSufficient: !!signalsRow,
+    executionRate: executionRateSignal,
+    trailingWeeklyExecutionRates: signalInputs?.trailingWeeklyExecutionRates ?? [],
+    worstMilestone,
+    projectedCompletion: projectedCompletionSignal,
+    targetDate: goal.target_date,
+  });
+
   let standingLine1: string;
   if (nodes.length === 0) {
     standingLine1 = "Nothing is complete yet — the roadmap is still being built.";
@@ -144,14 +167,6 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
     .eq("status", "done")
     .order("completed_at", { ascending: false })
     .limit(8);
-
-  const SIGNAL_ROWS = [
-    ["Execution rate", explanation?.executionRate, (v: number | string) => formatPercent(v as number)],
-    ["Momentum", explanation?.momentum, (v: number | string) => `${v}`],
-    ["Plan confidence", explanation?.planConfidence, (v: number | string) => formatPercent(v as number)],
-    ["Risk", explanation?.riskLevel, (v: number | string) => v as string],
-    ["Projected finish", explanation?.projectedCompletion, (v: number | string) => formatDateHuman(v as string)],
-  ] as const;
 
   return (
     <main id="main" className="mx-auto flex min-h-screen max-w-2xl flex-col gap-10 px-6 py-16">
@@ -193,33 +208,7 @@ export default async function GoalOverviewPage({ params }: { params: Promise<{ i
         <h2 id="signals-heading" className="text-[13px] font-medium uppercase tracking-wide text-ink-muted">
           How it&apos;s going
         </h2>
-        {!signalsRow ? (
-          <p className="text-sm text-ink-muted">
-            Not enough data yet. After seven days of execution, these become meaningful.
-          </p>
-        ) : (
-          <dl className="flex flex-col">
-            {SIGNAL_ROWS.map(([label, field, format]) => (
-              <div key={label} className="flex items-center justify-between gap-4 border-b border-rule py-2 last:border-b-0">
-                <dt className="text-sm text-ink-muted">{label}</dt>
-                {hasValue(field) ? (
-                  <details className="group text-right">
-                    <summary className="flex cursor-pointer list-none items-center gap-1.5 text-sm">
-                      <span className="font-medium tabular-nums text-ink">{format(field.value)}</span>
-                      <span aria-hidden="true" className="text-ink-faint">
-                        ⓘ
-                      </span>
-                    </summary>
-                    <p className="mt-1 max-w-xs text-xs text-ink-muted">{field.basis}</p>
-                    {field.caveat && <p className="text-xs text-ink-faint">{field.caveat}</p>}
-                  </details>
-                ) : (
-                  <dd className="text-sm text-ink-faint">{field?.caveat ?? "not enough data"}</dd>
-                )}
-              </div>
-            ))}
-          </dl>
-        )}
+        <GoalHealthExplanation headline={signalsRow ? healthExplanation.headline : null} explanation={explanation} />
       </section>
 
       {bottleneckNode && (
