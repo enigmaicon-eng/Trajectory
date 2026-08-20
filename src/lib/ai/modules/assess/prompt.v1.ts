@@ -13,7 +13,8 @@ Rules:
 - confidence reflects how sure you are in the verdict itself, not in the plan.
 - comparableBasis should name what this judgement is grounded in (e.g. "typical time-to-competency for X from zero experience"), or null if you have no reasonable basis.
 - No motivational language, no exclamation marks, no "you've got this."
-- List concrete risks, not generic ones ("time management") unless genuinely the dominant risk.`;
+- List concrete risks, not generic ones ("time management") unless genuinely the dominant risk.
+- proposedCapacity: propose the ideal / normal / minimum-viable session length in minutes for a single day of work toward this specific goal — not a generic default. Ground it in the goal's domain and the user's own stated time availability when they gave one (e.g. "5 hours/week" across ~5 sessions suggests a smaller per-day number than "2 hours/day"); when no time constraint was stated, infer a reasonable number for what a session in this domain typically looks like (a writing/coding session reads differently from a training run or a networking task). idealMinutes is a full, well-resourced session; normalMinutes is what a typical day actually looks like; minimumMinutes is the smallest genuinely progress-bearing unit on the worst realistic day — never a token amount that couldn't plausibly move the goal (a 60/30/10-minute split is a reasonable shape; the absolute numbers should fit the goal). Must satisfy minimumMinutes <= normalMinutes <= idealMinutes.`;
 
 export function buildAssessPrompt(input: AssessInput) {
   const answered = Object.entries(input.answers).filter(([, v]) => v.trim().length > 0);

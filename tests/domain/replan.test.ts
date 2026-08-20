@@ -7,6 +7,7 @@ import {
   detectMissedCheckins,
   evaluateReplanTriggers,
 } from "@/lib/domain/replan";
+import { TRIGGER_LEAD } from "@/lib/replan-copy";
 
 describe("detectLowExecution", () => {
   it("fires when the last 2 weeks are both under 0.5", () => {
@@ -77,5 +78,40 @@ describe("evaluateReplanTriggers", () => {
       daysSinceLastActivity: 1,
     });
     expect(triggers).toEqual([]);
+  });
+});
+
+// Minimum Viable Progress: a run of low-capacity days must produce a plan
+// adjustment, not a verdict on the user. §11.1 rule 6 — the system takes
+// responsibility for the plan, never frames a quiet stretch as a failure.
+describe("repeated low-capacity days", () => {
+  it("keeps firing low_execution across an extended low-capacity stretch, not just the first two weeks", () => {
+    const sixWeeksAtQuarterPace = [0.9, 0.2, 0.2, 0.2, 0.2, 0.2];
+    expect(detectLowExecution(sixWeeksAtQuarterPace)).toBe(true);
+  });
+
+  it("recovers as soon as two consecutive weeks clear the threshold again", () => {
+    const recovering = [0.2, 0.2, 0.2, 0.6, 0.7];
+    expect(detectLowExecution(recovering)).toBe(false);
+  });
+
+  it("the trigger produced from a low-execution stretch carries the non-punitive lead line", () => {
+    const triggers = evaluateReplanTriggers({
+      trailingWeeklyExecutionRates: [0.9, 0.2, 0.2, 0.2],
+      milestoneRisks: [],
+      capacityChange: null,
+      daysSinceLastActivity: 1,
+    });
+    const lowExecution = triggers.find((t) => t.kind === "low_execution");
+    expect(lowExecution).toBeDefined();
+    expect(TRIGGER_LEAD.low_execution).toBe("Your week changed. Let's adjust the plan.");
+  });
+
+  it("non-punitive lead copy never uses failure or guilt language", () => {
+    const banned = /\b(fail(ed)?|missed the mark|behind schedule!|streak|oops|uh-oh|sorry)\b/i;
+    for (const lead of Object.values(TRIGGER_LEAD)) {
+      expect(lead).not.toMatch(banned);
+      expect(lead).not.toContain("!");
+    }
   });
 });

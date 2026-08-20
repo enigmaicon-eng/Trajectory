@@ -41,6 +41,14 @@ describe("packDayTiers", () => {
     expect(result.minimum).toHaveLength(1);
   });
 
+  it("zero available time: a minimum-tier budget of 0 still returns the cheapest task, not an empty tier", () => {
+    const tasks = [t("minimum", 10, 0), t("normal", 30, 1)];
+    const zeroCapacity = { idealMinutes: 90, normalMinutes: 60, minimumMinutes: 0 };
+    const result = packDayTiers(tasks, zeroCapacity);
+    expect(result.minimum).toHaveLength(1);
+    expect(result.minimum[0].effortMinutes).toBe(10);
+  });
+
   it("orders within a tier by sequence", () => {
     const tasks = [t("normal", 10, 2), t("normal", 10, 0), t("normal", 10, 1)];
     const result = packDayTiers(tasks, capacity);

@@ -81,6 +81,7 @@ export const fixtures: GoalFixture[] = [
         ],
         comparableBasis: "Career switchers into PM typically take 9-18 months with a dedicated portfolio",
         alternative: null,
+        proposedCapacity: { idealMinutes: 60, normalMinutes: 45, minimumMinutes: 15 },
       },
     },
     decompose: {
@@ -644,6 +645,7 @@ export const fixtures: GoalFixture[] = [
           horizonWeeks: 26,
           whyStronger: "Achievable in the stated window and is the real first step on the only path to this outcome",
         },
+        proposedCapacity: { idealMinutes: 45, normalMinutes: 30, minimumMinutes: 10 },
       },
     },
   },
@@ -685,6 +687,7 @@ export const fixtures: GoalFixture[] = [
           horizonWeeks: 26,
           whyStronger: "Builds the prerequisite foundation and targets one section within a realistic study budget",
         },
+        proposedCapacity: { idealMinutes: 30, normalMinutes: 20, minimumMinutes: 10 },
       },
     },
   },

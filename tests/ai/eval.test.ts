@@ -46,6 +46,12 @@ describe("evaluation harness (§5.8)", () => {
     expect(clarifyOutputSchema.safeParse(overGenerated).success).toBe(false);
   });
 
+  it("assess: a proposedCapacity with minimum > ideal fails the invariant, not just a lint (mirrors the capacity_profiles DB check)", () => {
+    const inverted = { ...fixtures[0].assess!.recorded, proposedCapacity: { idealMinutes: 10, normalMinutes: 30, minimumMinutes: 60 } };
+    const parsed = assessOutputSchema.parse(inverted);
+    expect(() => applyAssessInvariants(parsed)).toThrow(/minimum <= normal <= ideal/);
+  });
+
   for (const fixture of fixtures) {
     describe(fixture.id, () => {
       it("clarify output satisfies schema and question-count invariant (AC-1.1)", () => {
@@ -65,6 +71,20 @@ describe("evaluation harness (§5.8)", () => {
             expect(repaired.alternative).not.toBeNull();
             expect(repaired.alternative?.outcomeStatement.length).toBeGreaterThan(0);
           }
+        });
+
+        // Minimum Viable Progress: the AI must be able to generate all three
+        // effort tiers for every goal, unrealistic verdicts included — the
+        // person still needs a daily rhythm even when this exact goal gets
+        // redirected to an alternative.
+        it("assess always proposes ideal/normal/minimum capacity, correctly ordered", () => {
+          const { recorded } = fixture.assess!;
+          const parsed = assessOutputSchema.parse(recorded);
+          const repaired = applyAssessInvariants(parsed);
+          const { idealMinutes, normalMinutes, minimumMinutes } = repaired.proposedCapacity;
+          expect(minimumMinutes).toBeGreaterThan(0);
+          expect(minimumMinutes).toBeLessThanOrEqual(normalMinutes);
+          expect(normalMinutes).toBeLessThanOrEqual(idealMinutes);
         });
       }
 

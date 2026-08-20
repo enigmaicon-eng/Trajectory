@@ -8,11 +8,14 @@ import { snapshotGraphRevision } from "@/server/actions/graph-revisions";
 
 type DB = SupabaseClient<Database>;
 
-// Phase 1 onboarding doesn't capture capacity yet (no intake UI). Until that
-// ships, decompose needs *some* budget to ground effort estimates against
-// (AC-3.10), so we seed a conservative default profile the first time a goal
-// is decomposed. A real capacity-intake surface can supersede this later by
-// inserting a newer capacity_profiles row — effective-dated, per §3.2.
+// Phase 1 onboarding still has no dedicated capacity-intake UI, but the
+// `assess` module now proposes a personalized ideal/normal/minimum-viable
+// day from the goal's domain and the user's own stated constraints (see the
+// 20260820090000 migration) — so the fallback below only fires when that
+// proposal is missing (an assessment run before this shipped, or no
+// assessment on record at all). A real capacity-intake surface can still
+// supersede either by inserting a newer capacity_profiles row —
+// effective-dated, per §3.2.
 const DEFAULT_CAPACITY = {
   idealMinutes: 90,
   normalMinutes: 60,
@@ -20,11 +23,29 @@ const DEFAULT_CAPACITY = {
   daysPerWeek: 5,
 } as const;
 
+interface ProposedCapacityLike {
+  idealMinutes: number;
+  normalMinutes: number;
+  minimumMinutes: number;
+}
+
+/** Defensive re-validation of a jsonb column — never trust stored AI output blindly. */
+function parseProposedCapacity(value: unknown): ProposedCapacityLike | null {
+  if (!value || typeof value !== "object") return null;
+  const { idealMinutes, normalMinutes, minimumMinutes } = value as Record<string, unknown>;
+  if (typeof idealMinutes !== "number" || typeof normalMinutes !== "number" || typeof minimumMinutes !== "number") {
+    return null;
+  }
+  if (!(minimumMinutes <= normalMinutes && normalMinutes <= idealMinutes)) return null;
+  return { idealMinutes, normalMinutes, minimumMinutes };
+}
+
 async function ensureCapacityProfile(
   db: DB,
   goalId: string,
   userId: string,
   effectiveFrom: string,
+  proposedCapacity: ProposedCapacityLike | null,
 ): Promise<DecomposeInput["capacity"]> {
   const { data: existing, error: readError } = await db
     .from("capacity_profiles")
@@ -44,19 +65,20 @@ async function ensureCapacityProfile(
     };
   }
 
+  const seed = proposedCapacity ?? DEFAULT_CAPACITY;
   const { error: insertError } = await db.from("capacity_profiles").insert({
     goal_id: goalId,
     user_id: userId,
     effective_from: effectiveFrom,
-    ideal_minutes: DEFAULT_CAPACITY.idealMinutes,
-    normal_minutes: DEFAULT_CAPACITY.normalMinutes,
-    minimum_minutes: DEFAULT_CAPACITY.minimumMinutes,
+    ideal_minutes: seed.idealMinutes,
+    normal_minutes: seed.normalMinutes,
+    minimum_minutes: seed.minimumMinutes,
     days_per_week: DEFAULT_CAPACITY.daysPerWeek,
-    note: "default — no capacity intake captured yet",
+    note: proposedCapacity ? "proposed by assess from the goal and stated constraints" : "default — no capacity proposal on record",
   });
-  if (insertError) throw new Error(`Failed to create default capacity profile: ${insertError.message}`);
+  if (insertError) throw new Error(`Failed to create capacity profile: ${insertError.message}`);
 
-  return DEFAULT_CAPACITY;
+  return { ...seed, daysPerWeek: DEFAULT_CAPACITY.daysPerWeek };
 }
 
 export interface DecomposeGoalResult {
@@ -89,7 +111,7 @@ export async function decomposeGoal(db: DB, goalId: string, userId: string): Pro
 
   const { data: assessment, error: assessmentError } = await db
     .from("feasibility_assessments")
-    .select("verdict, rationale")
+    .select("verdict, rationale, proposed_capacity")
     .eq("goal_id", goalId)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -103,7 +125,13 @@ export async function decomposeGoal(db: DB, goalId: string, userId: string): Pro
   if (constraintsError) throw new Error(constraintsError.message);
 
   const effectiveFrom = new Date().toISOString().slice(0, 10);
-  const capacity = await ensureCapacityProfile(db, goalId, userId, effectiveFrom);
+  const capacity = await ensureCapacityProfile(
+    db,
+    goalId,
+    userId,
+    effectiveFrom,
+    parseProposedCapacity(assessment?.proposed_capacity),
+  );
 
   const input: DecomposeInput = {
     outcomeStatement: goal.outcome_statement,

@@ -135,6 +135,8 @@ Index: `(user_id, status)`. **[v2]** `unique (id, user_id)` — the target every
 ### `feasibility_assessments` — versioned, append-only
 `verdict feasibility_verdict`, `confidence numeric(3,2) check between 0 and 1`, `rationale text`, `key_risks jsonb`, `comparable_basis text?`, `alternative jsonb?`. Index `(goal_id, created_at desc)`.
 
+**[v2] `proposed_capacity jsonb?`** — `{idealMinutes, normalMinutes, minimumMinutes}`, the `assess` module's proposed Minimum Viable Progress tiers for this specific goal (domain- and constraint-aware, not a shared default). Check-constrained to the same `minimum <= normal <= ideal` shape as `capacity_profiles`. `decomposeGoal` seeds the goal's first `capacity_profiles` row from this when present, falling back to a hardcoded default only when it's null (an assessment predating this column, or none on record).
+
 ### `constraints`
 `kind constraint_kind`, `label text`, `value_numeric`/`value_date`/`value_text`, `is_hard boolean default true`.
 

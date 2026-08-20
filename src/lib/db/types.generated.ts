@@ -303,6 +303,7 @@ export type Database = {
           goal_id: string
           id: string
           key_risks: Json
+          proposed_capacity: Json | null
           rationale: string
           user_id: string
           verdict: Database["public"]["Enums"]["feasibility_verdict"]
@@ -315,6 +316,7 @@ export type Database = {
           goal_id: string
           id?: string
           key_risks?: Json
+          proposed_capacity?: Json | null
           rationale: string
           user_id: string
           verdict: Database["public"]["Enums"]["feasibility_verdict"]
@@ -327,6 +329,7 @@ export type Database = {
           goal_id?: string
           id?: string
           key_risks?: Json
+          proposed_capacity?: Json | null
           rationale?: string
           user_id?: string
           verdict?: Database["public"]["Enums"]["feasibility_verdict"]

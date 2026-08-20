@@ -397,7 +397,7 @@ function TaskRow({
   );
 }
 
-const MINUTE_CHIPS = [15, 30, 60, 90];
+const MINUTE_CHIPS = [0, 15, 30, 60, 90];
 const ENERGY_LEVELS = [1, 2, 3, 4, 5];
 
 function CheckInSheet({
@@ -427,8 +427,19 @@ function CheckInSheet({
   async function handleSave() {
     setSaving(true);
     setError(false);
+    // "0" is a legitimate answer (zero available time) and must survive this
+    // parse — a falsy-coalescing `Number(x) || null` would silently discard
+    // it and read as "no answer," defaulting the day back to the normal tier
+    // instead of surfacing the minimum-viable one.
+    const parsedCustom = customMinutes.trim() === "" ? NaN : Number(customMinutes);
     const minutesAvailable =
-      variant === "forward" ? (minutes === "other" ? Number(customMinutes) || null : minutes) : null;
+      variant === "forward"
+        ? minutes === "other"
+          ? Number.isFinite(parsedCustom) && parsedCustom >= 0
+            ? parsedCustom
+            : null
+          : minutes
+        : null;
     try {
       await submitCheckIn({
         goalId,

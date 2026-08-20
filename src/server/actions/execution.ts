@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/db/server";
 import { todayISO } from "@/lib/domain/dates";
+import { rescheduleTask } from "@/lib/domain/reschedule";
 
 async function requireUser() {
   const db = await createClient();
@@ -123,6 +124,11 @@ export async function deferTask(input: z.infer<typeof deferTaskSchema>) {
   const { error: updateError } = await db.from("tasks").update({ status: "deferred" }).eq("id", taskId);
   if (updateError) throw new Error(updateError.message);
 
+  const rescheduled = rescheduleTask(
+    { title: task.title, why: task.why, effortMinutes: task.effort_minutes, tier: task.tier, sequence: task.sequence },
+    toDate,
+  );
+
   const { error: insertError } = await db.from("tasks").insert({
     id: randomUUID(),
     plan_week_id: task.plan_week_id,
@@ -130,14 +136,14 @@ export async function deferTask(input: z.infer<typeof deferTaskSchema>) {
     project_node_id: task.project_node_id,
     goal_id: task.goal_id,
     user_id: user.id,
-    title: task.title,
-    why: task.why,
-    effort_minutes: task.effort_minutes,
-    tier: task.tier,
-    scheduled_for: toDate,
-    sequence: task.sequence,
-    status: "pending",
-    is_user_added: false,
+    title: rescheduled.title,
+    why: rescheduled.why,
+    effort_minutes: rescheduled.effortMinutes,
+    tier: rescheduled.tier,
+    scheduled_for: rescheduled.scheduledFor,
+    sequence: rescheduled.sequence,
+    status: rescheduled.status,
+    is_user_added: rescheduled.isUserAdded,
   });
   if (insertError) throw new Error(insertError.message);
 

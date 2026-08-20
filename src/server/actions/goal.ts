@@ -143,6 +143,7 @@ export async function commitGoal(
     key_risks: draft.assessment.keyRisks,
     comparable_basis: draft.assessment.comparableBasis,
     alternative: draft.assessment.alternative,
+    proposed_capacity: draft.assessment.proposedCapacity,
   });
 
   const store = await cookies();
